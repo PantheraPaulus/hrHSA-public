@@ -33,7 +33,10 @@ def _get_availability_domain(used: gpd.GeoDataFrame, estimator: str = "MCP", thr
 
 def _get_sampling_points(domain, n, df = None, seed: int = 42) -> pd.DataFrame:
 
-    available = gpd.GeoDataFrame(geometry = domain.sample_points(n, rng = seed).explode(), crs = domain.crs)
+    available = gpd.GeoDataFrame(
+        geometry=domain.sample_points(n, rng=seed).explode(index_parts=True),
+        crs=domain.crs,
+    )
     
     if df is not None:
         samples = df[["Timestamp", "geometry"]].copy()
@@ -112,19 +115,28 @@ def _sample_env_layer(
     else:
         chunk_size_points = int(chunk_size_points)
 
-    xs = xr.DataArray(samples.geometry.x.to_numpy(), dims="points", name="x")
-    ys = xr.DataArray(samples.geometry.y.to_numpy(), dims="points", name="y")
+    results = []
 
-    sampled = env.sel(x=xs, y=ys, method="nearest").chunk({"points": chunk_size_points})
+    for i in range(0, len(samples), chunk_size_points):
+        batch = samples.iloc[i:i + chunk_size_points]
 
-    arr = sampled.data
-    arr = arr.compute() if hasattr(arr, "compute") else np.asarray(arr)
-    arr = np.asarray(arr, dtype="float32")
+        xs = xr.DataArray(batch.geometry.x.to_numpy(), dims="points", name="x")
+        ys = xr.DataArray(batch.geometry.y.to_numpy(), dims="points", name="y")
 
-    bands = sampled["band"].to_numpy().tolist()
-    df = pd.DataFrame(arr.T, columns=bands)
-    df["x"] = xs.to_numpy()
-    df["y"] = ys.to_numpy()
-    df["used"] = samples["used"].to_numpy()
-    df["Timestamp"] = samples["Timestamp"].to_numpy()
-    return df
+        sampled_batch = env.sel(x=xs, y=ys, method="nearest")
+
+        arr = sampled_batch.data
+        arr = arr.compute() if hasattr(arr, "compute") else np.asarray(arr)
+        arr = np.asarray(arr, dtype="float32")
+
+        bands = sampled_batch["band"].to_numpy().tolist()
+        df_batch = pd.DataFrame(arr.T, columns=bands)
+        df_batch["x"] = xs.to_numpy()
+        df_batch["y"] = ys.to_numpy()
+        df_batch["used"] = batch["used"].to_numpy()
+        df_batch["Timestamp"] = batch["Timestamp"].to_numpy()
+
+        results.append(df_batch)
+
+    df = pd.concat(results, ignore_index=True)
+    return df    
