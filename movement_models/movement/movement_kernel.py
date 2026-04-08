@@ -931,6 +931,13 @@ def fit_vonmises_distribution_bayes(
     kappa_samples = kept[:, 0]
     mu_samples = kept[:, 1]
 
+    log_lik_samples = np.array([
+        vonmises.logpdf(angles, kappa_sample, loc=mu_sample)
+        for kappa_sample, mu_sample in kept
+    ])
+    
+    waic = _compute_waic(log_lik_samples)
+
     return {
         "n": len(angles),
         "distribution": "vonmises_bayes",
@@ -958,6 +965,8 @@ def fit_vonmises_distribution_bayes(
         "prior_scale": prior_scale,
         "samples": samples,
         "posterior_samples": kept,
+        "log_lik_samples": log_lik_samples,
+        "waic": waic
     }
 
 def _vm_uniform_loglik(kappa, w, angles):
@@ -1060,6 +1069,20 @@ def fit_vm_uniform_distribution_bayes(
     kappa_samples = kept[:, 0]
     w_samples = kept[:, 1]
 
+    log_lik_samples = np.array([
+        np.log(
+            np.clip(
+                w_sample * vonmises.pdf(angles, kappa_sample, loc=0) +
+                (1 - w_sample) * (1 / (2 * np.pi)),
+                1e-12,
+                None,
+            )
+        )
+        for kappa_sample, w_sample in kept
+    ])
+
+    waic = _compute_waic(log_lik_samples)
+
     return {
         "n": len(angles),
         "distribution": "vm_uniform_bayes",
@@ -1087,6 +1110,8 @@ def fit_vm_uniform_distribution_bayes(
         "prior_scale": prior_scale,
         "samples": samples,
         "posterior_samples": kept,
+        "log_lik_samples": log_lik_samples,
+        "waic": waic
     }    
 
     
@@ -1106,14 +1131,34 @@ def fit_turn_angle_distribution(
     if method == "bayes":
         if bayes_model == "vonmises":
             return fit_vonmises_distribution_bayes(angles, **bayes_kwargs)
-
+    
         elif bayes_model == "vm_uniform":
             return fit_vm_uniform_distribution_bayes(angles, **bayes_kwargs)
-
+    
+        elif bayes_model is None:
+            model_results = [
+                fit_vonmises_distribution_bayes(angles, **bayes_kwargs),
+                fit_vm_uniform_distribution_bayes(angles, **bayes_kwargs),
+            ]
+    
+            model_table = pd.DataFrame([
+                {
+                    "distribution": res["distribution"],
+                    "waic": res["waic"],
+                }
+                for res in model_results
+            ]).sort_values("waic").reset_index(drop=True)
+    
+            winner_name = model_table.iloc[0]["distribution"]
+            winner = next(res for res in model_results if res["distribution"] == winner_name)
+    
+            winner["model_table"] = model_table
+            return winner
+    
         else:
             raise ValueError(
                 "For method='bayes', bayes_model must be one of: "
-                "'vonmises', 'vm_uniform'."
+                "'vonmises', 'vm_uniform', or None."
             )
 
     elif method == "mle":
@@ -1266,6 +1311,9 @@ def fit_movement_kernel_per_id(
 
         if "acceptance_rate" in step_fit:
             row["step_acceptance_rate"] = step_fit["acceptance_rate"]
+
+        if "waic" in angle_fit:
+            row["angle_waic"] = angle_fit["waic"]     
 
         if "posterior_mean" in step_fit:
             row["step_posterior_mean"] = step_fit["posterior_mean"]
