@@ -34,14 +34,24 @@ from .movement_mh import (
     fit_vm_uniform_distribution_bayes,
 )
 
+from .movement_hmc import (
+    fit_exp_distribution_hmc,
+    fit_gamma_distribution_hmc,
+    fit_weibull_distribution_hmc,
+    fit_lognorm_distribution_hmc,
+    fit_vonmises_distribution_hmc,
+    fit_vm_uniform_distribution_hmc,
+)
 
 def fit_step_distribution(
     steps,
     *,
     method="mle",
     bayes_model=None,
+    hmc_model=None,
+    selection_method="auto",
     cutoff=np.inf,
-    **bayes_kwargs,
+    **kwargs,
 ):
     steps = pd.Series(steps).dropna()
     steps = steps[(steps > 0) & (steps <= cutoff)].to_numpy()
@@ -49,33 +59,45 @@ def fit_step_distribution(
     if len(steps) == 0:
         raise ValueError("No positive step lengths remaining after filtering.")
 
+    bayes_kwargs = {
+        k.removeprefix("bayes_"): v
+        for k, v in kwargs.items()
+        if k.startswith("bayes_")
+    }
+
+    hmc_kwargs = {
+        k.removeprefix("hmc_"): v
+        for k, v in kwargs.items()
+        if k.startswith("hmc_")
+    }
+
     if method == "bayes":
         if bayes_model is not None:
             if bayes_model == "exp":
                 return fit_exp_distribution_bayes(steps, cutoff=cutoff, **bayes_kwargs)
-    
+
             elif bayes_model == "gamma":
                 return fit_gamma_distribution_bayes(steps, cutoff=cutoff, **bayes_kwargs)
-    
+
             elif bayes_model == "weibull":
                 return fit_weibull_distribution_bayes(steps, cutoff=cutoff, **bayes_kwargs)
-    
+
             elif bayes_model == "lognorm":
                 return fit_lognorm_distribution_bayes(steps, cutoff=cutoff, **bayes_kwargs)
-    
+
             else:
                 raise ValueError(
                     "For method='bayes', bayes_model must be one of: "
                     "'exp', 'gamma', 'weibull', 'lognorm', or None."
                 )
-    
+
         model_results = [
             fit_exp_distribution_bayes(steps, cutoff=cutoff, **bayes_kwargs),
             fit_gamma_distribution_bayes(steps, cutoff=cutoff, **bayes_kwargs),
             fit_weibull_distribution_bayes(steps, cutoff=cutoff, **bayes_kwargs),
             fit_lognorm_distribution_bayes(steps, cutoff=cutoff, **bayes_kwargs),
         ]
-    
+
         model_table = pd.DataFrame([
             {
                 "distribution": res["distribution"],
@@ -83,10 +105,51 @@ def fit_step_distribution(
             }
             for res in model_results
         ]).sort_values("waic").reset_index(drop=True)
-    
+
         winner_name = model_table.iloc[0]["distribution"]
         winner = next(res for res in model_results if res["distribution"] == winner_name)
-    
+
+        winner["model_table"] = model_table
+        return winner
+
+    elif method == "hmc":
+        if hmc_model is not None:
+            if hmc_model == "exp":
+                return fit_exp_distribution_hmc(steps, cutoff=cutoff, **hmc_kwargs)
+
+            elif hmc_model == "gamma":
+                return fit_gamma_distribution_hmc(steps, cutoff=cutoff, **hmc_kwargs)
+
+            elif hmc_model == "weibull":
+                return fit_weibull_distribution_hmc(steps, cutoff=cutoff, **hmc_kwargs)
+
+            elif hmc_model == "lognorm":
+                return fit_lognorm_distribution_hmc(steps, cutoff=cutoff, **hmc_kwargs)
+
+            else:
+                raise ValueError(
+                    "For method='hmc', hmc_model must be one of: "
+                    "'exp', 'gamma', 'weibull', 'lognorm', or None."
+                )
+
+        model_results = [
+            fit_exp_distribution_hmc(steps, cutoff=cutoff, **hmc_kwargs),
+            fit_gamma_distribution_hmc(steps, cutoff=cutoff, **hmc_kwargs),
+            fit_weibull_distribution_hmc(steps, cutoff=cutoff, **hmc_kwargs),
+            fit_lognorm_distribution_hmc(steps, cutoff=cutoff, **hmc_kwargs),
+        ]
+
+        model_table = pd.DataFrame([
+            {
+                "distribution": res["distribution"],
+                "waic": res["waic"],
+            }
+            for res in model_results
+        ]).sort_values("waic").reset_index(drop=True)
+
+        winner_name = model_table.iloc[0]["distribution"]
+        winner = next(res for res in model_results if res["distribution"] == winner_name)
+
         winner["model_table"] = model_table
         return winner
 
@@ -141,7 +204,7 @@ def fit_step_distribution(
         }
 
     else:
-        raise ValueError("method must be 'mle' or 'bayes'")
+        raise ValueError("method must be 'mle', 'bayes', or 'hmc'")
 
 
 def fit_turn_angle_distribution(
@@ -149,26 +212,40 @@ def fit_turn_angle_distribution(
     *,
     method="mle",
     bayes_model=None,
-    **bayes_kwargs,
+    hmc_model=None,
+    selection_method="auto",
+    **kwargs,
 ):
     angles = pd.Series(angles).dropna().to_numpy()
 
     if len(angles) == 0:
         raise ValueError("No turning angles available after filtering.")
 
+    bayes_kwargs = {
+        k.removeprefix("bayes_"): v
+        for k, v in kwargs.items()
+        if k.startswith("bayes_")
+    }
+
+    hmc_kwargs = {
+        k.removeprefix("hmc_"): v
+        for k, v in kwargs.items()
+        if k.startswith("hmc_")
+    }
+
     if method == "bayes":
         if bayes_model == "vonmises":
             return fit_vonmises_distribution_bayes(angles, **bayes_kwargs)
-    
+
         elif bayes_model == "vm_uniform":
             return fit_vm_uniform_distribution_bayes(angles, **bayes_kwargs)
-    
+
         elif bayes_model is None:
             model_results = [
                 fit_vonmises_distribution_bayes(angles, **bayes_kwargs),
                 fit_vm_uniform_distribution_bayes(angles, **bayes_kwargs),
             ]
-    
+
             model_table = pd.DataFrame([
                 {
                     "distribution": res["distribution"],
@@ -176,16 +253,49 @@ def fit_turn_angle_distribution(
                 }
                 for res in model_results
             ]).sort_values("waic").reset_index(drop=True)
-    
+
             winner_name = model_table.iloc[0]["distribution"]
             winner = next(res for res in model_results if res["distribution"] == winner_name)
-    
+
             winner["model_table"] = model_table
             return winner
-    
+
         else:
             raise ValueError(
                 "For method='bayes', bayes_model must be one of: "
+                "'vonmises', 'vm_uniform', or None."
+            )
+
+    elif method == "hmc":
+        if hmc_model == "vonmises":
+            return fit_vonmises_distribution_hmc(angles, **hmc_kwargs)
+
+        elif hmc_model == "vm_uniform":
+            return fit_vm_uniform_distribution_hmc(angles, **hmc_kwargs)
+
+        elif hmc_model is None:
+            model_results = [
+                fit_vonmises_distribution_hmc(angles, **hmc_kwargs),
+                fit_vm_uniform_distribution_hmc(angles, **hmc_kwargs),
+            ]
+
+            model_table = pd.DataFrame([
+                {
+                    "distribution": res["distribution"],
+                    "waic": res["waic"],
+                }
+                for res in model_results
+            ]).sort_values("waic").reset_index(drop=True)
+
+            winner_name = model_table.iloc[0]["distribution"]
+            winner = next(res for res in model_results if res["distribution"] == winner_name)
+
+            winner["model_table"] = model_table
+            return winner
+
+        else:
+            raise ValueError(
+                "For method='hmc', hmc_model must be one of: "
                 "'vonmises', 'vm_uniform', or None."
             )
 
@@ -224,7 +334,7 @@ def fit_turn_angle_distribution(
         }
 
     else:
-        raise ValueError("method must be 'mle' or 'bayes'")
+        raise ValueError("method must be 'mle', 'bayes', or 'hmc'")
 
 
 def fit_movement_kernel_per_id(
@@ -243,8 +353,10 @@ def fit_movement_kernel_per_id(
     step_cutoff=np.inf,
     step_method="mle",
     step_bayes_model=None,
+    step_hmc_model=None,
     angle_method="mle",
     angle_bayes_model=None,
+    angle_hmc_model=None,
     **kwargs,
 ):
     reloc = prepare_trajectory_data(
@@ -260,18 +372,18 @@ def fit_movement_kernel_per_id(
     if missing_cols:
         raise ValueError(f"Missing required columns: {missing_cols}")
 
-    step_bayes_kwargs = {
+    step_backend_kwargs = {
         k.removeprefix("step_"): v
         for k, v in kwargs.items()
         if k.startswith("step_")
     }
-    
-    angle_bayes_kwargs = {
+
+    angle_backend_kwargs = {
         k.removeprefix("angle_"): v
         for k, v in kwargs.items()
         if k.startswith("angle_")
-    }    
-    
+    }
+
     reloc_gdf = to_reloc_gdf_projected(
         reloc,
         lon_col=lon_col,
@@ -309,15 +421,19 @@ def fit_movement_kernel_per_id(
             step_subset,
             method=step_method,
             bayes_model=step_bayes_model,
+            hmc_model=step_hmc_model,
             cutoff=step_cutoff,
-            **step_bayes_kwargs,
+            **step_backend_kwargs,
         )
+
         angle_fit = fit_turn_angle_distribution(
             angle_subset,
             method=angle_method,
             bayes_model=angle_bayes_model,
-            **angle_bayes_kwargs,
+            hmc_model=angle_hmc_model,
+            **angle_backend_kwargs,
         )
+
         row = {
             id_col: animal_id,
             "n_steps": step_fit["n"],
@@ -341,7 +457,7 @@ def fit_movement_kernel_per_id(
             row["step_acceptance_rate"] = step_fit["acceptance_rate"]
 
         if "waic" in angle_fit:
-            row["angle_waic"] = angle_fit["waic"]     
+            row["angle_waic"] = angle_fit["waic"]
 
         if "posterior_mean" in step_fit:
             row["step_posterior_mean"] = step_fit["posterior_mean"]
@@ -373,8 +489,15 @@ def fit_movement_kernel_per_id(
             row["step_posterior_q025_sigma"] = step_fit["posterior_q025_sigma"]
             row["step_posterior_q975_sigma"] = step_fit["posterior_q975_sigma"]
 
+        if "posterior_mean_params" in step_fit:
+            row["step_posterior_mean_params"] = step_fit["posterior_mean_params"]
+        if "posterior_median_params" in step_fit:
+            row["step_posterior_median_params"] = step_fit["posterior_median_params"]
+        if "posterior_q025_params" in step_fit:
+            row["step_posterior_q025_params"] = step_fit["posterior_q025_params"]
+        if "posterior_q975_params" in step_fit:
+            row["step_posterior_q975_params"] = step_fit["posterior_q975_params"]
 
-        
         if "vonmises_kappa" in angle_fit:
             row["vonmises_kappa"] = angle_fit["vonmises_kappa"]
 
@@ -407,6 +530,15 @@ def fit_movement_kernel_per_id(
             row["angle_posterior_median_w"] = angle_fit["posterior_median_w"]
             row["angle_posterior_q025_w"] = angle_fit["posterior_q025_w"]
             row["angle_posterior_q975_w"] = angle_fit["posterior_q975_w"]
+
+        if "posterior_mean_params" in angle_fit:
+            row["angle_posterior_mean_params"] = angle_fit["posterior_mean_params"]
+        if "posterior_median_params" in angle_fit:
+            row["angle_posterior_median_params"] = angle_fit["posterior_median_params"]
+        if "posterior_q025_params" in angle_fit:
+            row["angle_posterior_q025_params"] = angle_fit["posterior_q025_params"]
+        if "posterior_q975_params" in angle_fit:
+            row["angle_posterior_q975_params"] = angle_fit["posterior_q975_params"]
 
         rows.append(row)
 

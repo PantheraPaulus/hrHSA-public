@@ -6,9 +6,7 @@ from scipy.stats import vonmises
 from scipy.special import expit, logit
 
 def _compute_waic(log_lik_samples):
-    """
-    log_lik_samples: array of shape (n_posterior_samples, n_observations)
-    """
+
     log_lik_samples = np.asarray(log_lik_samples)
 
     lppd = np.sum(
@@ -526,132 +524,6 @@ def fit_lognorm_distribution_bayes(
 
 
 
-def _vonmises_loglik(kappa, mu, angles):
-    if kappa <= 0:
-        return -np.inf
-    return np.sum(vonmises.logpdf(angles, kappa, loc=mu))
-
-
-def _vonmises_logprior(kappa, mu, prior_scale=10.0):
-    if kappa <= 0:
-        return -np.inf
-
-    lp_kappa = stats.halfnorm.logpdf(kappa, loc=0, scale=prior_scale)
-    lp_mu = stats.uniform.logpdf(mu, loc=-np.pi, scale=2 * np.pi)
-
-    return lp_kappa + lp_mu
-
-
-def _vonmises_logposterior(kappa, mu, angles, prior_scale=10.0):
-    return _vonmises_loglik(kappa, mu, angles) + _vonmises_logprior(
-        kappa, mu, prior_scale=prior_scale
-    )
-
-
-def fit_vonmises_distribution_bayes(
-    angles,
-    *,
-    n_iter=20000,
-    init_params=None,
-    proposal_sd=0.5,
-    prior_scale=10.0,
-    burn_in=2000,
-):
-    angles = pd.Series(angles).dropna().to_numpy()
-
-    if len(angles) == 0:
-        raise ValueError("No turning angles available after filtering.")
-
-    if init_params is None:
-        init_kappa = 1.0
-        init_mu = 0.0
-    else:
-        init_kappa, init_mu = init_params
-
-    if init_kappa <= 0:
-        raise ValueError("Initial kappa must be positive.")
-
-    samples = np.empty((n_iter, 2))
-    accepted = 0
-
-    current_kappa = init_kappa
-    current_mu = init_mu
-
-    current_lp = _vonmises_logposterior(
-        current_kappa,
-        current_mu,
-        angles,
-        prior_scale=prior_scale,
-    )
-
-    for i in range(n_iter):
-        proposal_kappa = np.exp(
-            np.random.normal(np.log(current_kappa), proposal_sd)
-        )
-        proposal_mu = np.random.normal(current_mu, proposal_sd)
-        proposal_mu = ((proposal_mu + np.pi) % (2 * np.pi)) - np.pi
-
-        proposal_lp = _vonmises_logposterior(
-            proposal_kappa,
-            proposal_mu,
-            angles,
-            prior_scale=prior_scale,
-        )
-
-        log_alpha = proposal_lp - current_lp
-
-        if np.log(np.random.rand()) < log_alpha:
-            current_kappa = proposal_kappa
-            current_mu = proposal_mu
-            current_lp = proposal_lp
-            accepted += 1
-
-        samples[i, 0] = current_kappa
-        samples[i, 1] = current_mu
-
-    kept = samples[burn_in:]
-
-    kappa_samples = kept[:, 0]
-    mu_samples = kept[:, 1]
-
-    log_lik_samples = np.array([
-        vonmises.logpdf(angles, kappa_sample, loc=mu_sample)
-        for kappa_sample, mu_sample in kept
-    ])
-    
-    waic = _compute_waic(log_lik_samples)
-
-    return {
-        "n": len(angles),
-        "distribution": "vonmises_bayes",
-        "posterior_mean_kappa": np.mean(kappa_samples),
-        "posterior_median_kappa": np.median(kappa_samples),
-        "posterior_q025_kappa": np.quantile(kappa_samples, 0.025),
-        "posterior_q975_kappa": np.quantile(kappa_samples, 0.975),
-        "posterior_mean_mu": np.mean(mu_samples),
-        "posterior_median_mu": np.median(mu_samples),
-        "posterior_q025_mu": np.quantile(mu_samples, 0.025),
-        "posterior_q975_mu": np.quantile(mu_samples, 0.975),
-        "posterior_mean_params": (np.mean(kappa_samples), np.mean(mu_samples)),
-        "posterior_median_params": (np.median(kappa_samples), np.median(mu_samples)),
-        "posterior_q025_params": (
-            np.quantile(kappa_samples, 0.025),
-            np.quantile(mu_samples, 0.025),
-        ),
-        "posterior_q975_params": (
-            np.quantile(kappa_samples, 0.975),
-            np.quantile(mu_samples, 0.975),
-        ),
-        "acceptance_rate": accepted / n_iter,
-        "init_params": (init_kappa, init_mu),
-        "proposal_sd": proposal_sd,
-        "prior_scale": prior_scale,
-        "samples": samples,
-        "posterior_samples": kept,
-        "log_lik_samples": log_lik_samples,
-        "waic": waic
-    }
-    
 def _vonmises_loglik(kappa, mu, angles):
     if kappa <= 0:
         return -np.inf
