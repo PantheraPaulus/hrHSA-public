@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="logo_rsf2.png" width="300">
+  <img src="logo_rsf2.png" width="600">
 </p>
 
 Python-Package providing a standardized workflow to perform Resource Selection Analysis
