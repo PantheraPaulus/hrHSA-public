@@ -18,6 +18,7 @@ src/hsa/
 ├── rsf/                 # RSF fitting, prediction, validation, CV, selection
 ├── movement/            # steps, turn angles, movement kernels
 ├── remote_sensing/      # optional Earth Engine / predictor-stack helpers
+├── compute/             # Dask utilities for local and HPC workflows
 └── simulation/          # future SSF / mechanistic movement simulation
 ```
 
@@ -27,6 +28,12 @@ src/hsa/
 conda env create -f environment.yml
 conda activate hsa
 pip install -e .
+```
+
+For a pip-based HPC install with the optional Dask/SLURM tools:
+
+```bash
+pip install -e ".[hpc,earthengine]"
 ```
 
 ## Minimal RSF pattern
@@ -42,6 +49,41 @@ spec = FeatureSpec(linear=["ndvi_mean_30m"], add_const=True)
 # df = sample_raster_stack(samples, env)
 # model, scaler, spec, meta = fit_rsf(df, spec)
 # rsf = predict_rsf_surface(env, model, scaler, spec, meta)
+```
+
+## Dask / HPC pattern
+
+Local workstation or notebook:
+
+```python
+from hsa.compute import make_local_dask_client
+
+client = make_local_dask_client(n_workers=8, local_directory="/tmp/hsa-dask")
+```
+
+SLURM-backed cluster using `dask-jobqueue`:
+
+```python
+from dask.distributed import Client
+from hsa.compute import make_slurm_cluster
+
+cluster = make_slurm_cluster(
+    queue="general",
+    cores=4,
+    processes=4,
+    memory="32GB",
+    walltime="04:00:00",
+    scale_jobs=10,
+)
+client = Client(cluster)
+```
+
+Earth Engine must be initialized separately on each worker when EE calls happen inside Dask tasks:
+
+```python
+from hsa.compute import initialize_earth_engine_on_workers
+
+initialize_earth_engine_on_workers(client, project="your-ee-project")
 ```
 
 ## Examples
