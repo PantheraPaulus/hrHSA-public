@@ -47,6 +47,9 @@ def sample_available_points(
 ) -> gpd.GeoDataFrame:
     """Sample available points and optionally append used points."""
 
+    if domain.crs is None:
+        raise ValueError("domain.crs is None; set a CRS before sampling available points.")
+
     available = gpd.GeoDataFrame(
         geometry=domain.sample_points(n, rng=seed).explode(index_parts=True),
         crs=domain.crs,
@@ -56,6 +59,11 @@ def sample_available_points(
 
     if used is None:
         return available
+
+    if used.crs is None:
+        raise ValueError("used.crs is None; set a CRS before appending used points.")
+    if used.crs != domain.crs:
+        used = used.to_crs(domain.crs)
 
     used_min = used[[timestamp_col, "geometry"]].copy()
     used_min["used"] = True
