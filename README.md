@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="logo_rsf2.png" width="600">
+  <img src="logo/logo_rsf2.png" width="600">
 </p>
 
 # HSA

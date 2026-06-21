@@ -5,7 +5,7 @@ import scipy.stats as stats
 from scipy.optimize import minimize
 from scipy.stats import vonmises
 
-from movement_models.io import to_reloc_gdf_projected
+from OLD_CODE.io import to_reloc_gdf_projected
 
 from .movement_geometry import (
     prepare_trajectory_data,

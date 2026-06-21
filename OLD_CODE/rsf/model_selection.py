@@ -2,8 +2,8 @@ import itertools
 import pandas as pd
 import xarray as xr
 
-from movement_models.types import FeatureSpec
-from movement_models.rsf.model import fit_rsf
+from OLD_CODE.types import FeatureSpec
+from OLD_CODE.rsf.model import fit_rsf
 
 def eval_all_linear_candidates(df: pd.DataFrame, env: xr.DataArray, subset: list = None):
 

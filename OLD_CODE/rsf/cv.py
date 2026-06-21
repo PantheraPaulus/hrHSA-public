@@ -5,11 +5,11 @@ import pandas as pd
 import xarray as xr
 from dataclasses import dataclass
 
-from movement_models.types import FeatureSpec, _FoldSplit
-from movement_models.sampling import _get_availability_domain, _get_sampling_points, _sample_env_layer
-from movement_models.rsf.model import fit_rsf, predict_rsf_points
-from movement_models.rsf.surface import get_rsf_surface
-from movement_models.rsf.eval import fixed_width_Boyce
+from OLD_CODE.types import FeatureSpec, _FoldSplit
+from OLD_CODE.sampling import _get_availability_domain, _get_sampling_points, _sample_env_layer
+from OLD_CODE.rsf.model import fit_rsf, predict_rsf_points
+from OLD_CODE.rsf.surface import get_rsf_surface
+from OLD_CODE.rsf.eval import fixed_width_Boyce
 
 def _assign_week_folds(reloc: gpd.GeoDataFrame, k: int = 5, seed: int = 42) -> gpd.GeoDataFrame:
     g = reloc.copy()
