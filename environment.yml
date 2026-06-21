@@ -16,6 +16,7 @@ dependencies:
   - pyogrio
   - dask
   - distributed
+  - dask-jobqueue
   - zarr
   - jupyter
   - pip
