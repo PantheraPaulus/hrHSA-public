@@ -18,6 +18,71 @@ def split_multiscale_name(name: str) -> tuple[str, str | None]:
     return name, None
 
 
+def _get_template_layer(stack: xr.DataArray) -> xr.DataArray:
+    """Return a single-band template layer from a ``band, y, x`` stack."""
+
+    if "band" not in stack.dims:
+        return stack
+    return stack.sel(band=stack.band.values[0])
+
+
+def _ensure_rio_crs(layer: xr.DataArray, *, name: str) -> None:
+    """Raise a clear error if a layer has no rioxarray CRS."""
+
+    try:
+        crs = layer.rio.crs
+    except Exception as exc:
+        raise ValueError(
+            f"Layer {name!r} has no rioxarray spatial metadata. "
+            "Write a CRS with layer.rio.write_crs(...) before prediction."
+        ) from exc
+    if crs is None:
+        raise ValueError(
+            f"Layer {name!r} has no CRS. Write one with layer.rio.write_crs(...) before prediction."
+        )
+
+
+def resample_layer_to_template(
+    layer: xr.DataArray,
+    template: xr.DataArray,
+    *,
+    resampling: str = "nearest",
+) -> xr.DataArray:
+    """Reproject/resample one layer to match another layer's grid.
+
+    Parameters
+    ----------
+    layer:
+        Source layer to reproject.
+    template:
+        Target grid. Usually one band from the target-resolution stack.
+    resampling:
+        One of ``"nearest"``, ``"bilinear"``, ``"cubic"``, ``"average"``,
+        ``"mode"``, ``"min"`` or ``"max"``.
+    """
+
+    from rasterio.enums import Resampling
+
+    resampling_methods = {
+        "nearest": Resampling.nearest,
+        "bilinear": Resampling.bilinear,
+        "cubic": Resampling.cubic,
+        "average": Resampling.average,
+        "mode": Resampling.mode,
+        "min": Resampling.min,
+        "max": Resampling.max,
+    }
+    if resampling not in resampling_methods:
+        raise ValueError(
+            f"Unsupported resampling method {resampling!r}. "
+            f"Choose one of {sorted(resampling_methods)}."
+        )
+
+    _ensure_rio_crs(layer, name="source layer")
+    _ensure_rio_crs(template, name="template layer")
+    return layer.rio.reproject_match(template, resampling=resampling_methods[resampling])
+
+
 def predict_rsf_surface(
     env: xr.DataArray,
     model,
@@ -80,16 +145,25 @@ def build_prediction_stack(
     predictors: list[str],
     *,
     target_scale: str,
+    categorical_predictors: list[str] | tuple[str, ...] | None = None,
+    continuous_resampling: str = "bilinear",
+    categorical_resampling: str = "nearest",
 ) -> xr.DataArray:
-    """Build a prediction stack whose bands exactly match multiscale predictor names.
+    """Build a common-grid raster stack matching fitted multiscale predictor names.
 
-    This starter implementation assumes all requested scales already exist in
-    ``env_by_scale`` and share a compatible grid. Reprojection/resampling logic
-    from the pangolin notebook should be added here when needed.
+    ``env_by_scale`` should contain stacks keyed by suffixes such as ``"30m"``,
+    ``"90m"`` and ``"300m"``. Predictors must use matching suffixes, for
+    example ``"ndvi_mean_90m"``. Layers from non-target scales are reprojected
+    and resampled to the target stack with ``rioxarray.reproject_match``.
     """
 
     if target_scale not in env_by_scale:
         raise KeyError(f"target_scale={target_scale!r} not found. Available: {list(env_by_scale)}")
+
+    categorical_predictors = set(categorical_predictors or [])
+    target_stack = env_by_scale[target_scale]
+    template = _get_template_layer(target_stack)
+    _ensure_rio_crs(template, name=f"target scale {target_scale!r}")
 
     layers: list[xr.DataArray] = []
     for predictor in predictors:
@@ -99,10 +173,34 @@ def build_prediction_stack(
         if scale not in env_by_scale:
             raise KeyError(f"Scale {scale!r} required by {predictor!r} not found in env_by_scale.")
 
-        layer = env_by_scale[scale].sel(band=base).rename(predictor).expand_dims(band=[predictor])
+        source_stack = env_by_scale[scale]
+        if base not in source_stack.band.values:
+            raise KeyError(
+                f"Band {base!r} required by predictor {predictor!r} not found in scale {scale!r}."
+            )
+
+        source_layer = source_stack.sel(band=base)
+        _ensure_rio_crs(source_layer, name=f"{base!r} at scale {scale!r}")
+
+        if scale == target_scale:
+            layer = source_layer
+        else:
+            method = categorical_resampling if predictor in categorical_predictors else continuous_resampling
+            layer = resample_layer_to_template(source_layer, template, resampling=method)
+
+        layer = layer.rename(predictor).expand_dims(band=[predictor])
+        try:
+            layer = layer.rio.write_crs(template.rio.crs)
+        except Exception:
+            pass
         layers.append(layer)
 
-    return xr.concat(layers, dim="band").transpose("band", "y", "x")
+    stack = xr.concat(layers, dim="band").transpose("band", "y", "x")
+    try:
+        stack = stack.rio.write_crs(template.rio.crs)
+    except Exception:
+        pass
+    return stack
 
 
 def predict_rsf_surface_multiscale(
@@ -113,9 +211,18 @@ def predict_rsf_surface_multiscale(
     scaler: StandardScaler,
     spec: FeatureSpec,
     meta: dict[str, Any],
+    continuous_resampling: str = "bilinear",
+    categorical_resampling: str = "nearest",
 ) -> xr.DataArray:
     """Project a fitted multiscale RSF model onto raster stacks."""
 
     predictors = [*spec.linear, *spec.categorical]
-    stack = build_prediction_stack(env_by_scale, predictors, target_scale=target_scale)
+    stack = build_prediction_stack(
+        env_by_scale,
+        predictors,
+        target_scale=target_scale,
+        categorical_predictors=spec.categorical,
+        continuous_resampling=continuous_resampling,
+        categorical_resampling=categorical_resampling,
+    )
     return predict_rsf_surface(stack, model, scaler, spec, meta)
