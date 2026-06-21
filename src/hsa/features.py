@@ -1,0 +1,115 @@
+from __future__ import annotations
+
+from typing import Any
+
+import numpy as np
+import pandas as pd
+import statsmodels.api as sm
+from sklearn.preprocessing import StandardScaler
+
+from hsa.types import FeatureSpec
+
+
+def build_design_matrix(
+    df: pd.DataFrame,
+    spec: FeatureSpec,
+    scaler: StandardScaler | None = None,
+    *,
+    fit_scaler: bool = False,
+    min_available_proportion: float = 0.0,
+    meta: dict[str, Any] | None = None,
+) -> tuple[pd.DataFrame, StandardScaler, dict[str, Any]]:
+    """Build a model matrix from a :class:`FeatureSpec`.
+
+    The function is deliberately stateful via ``scaler`` and ``meta``. During
+    fitting, call it with ``fit_scaler=True`` and ``meta=None``. During
+    prediction, pass the fitted scaler and metadata so categorical levels and
+    column order match the fitted model.
+    """
+
+    df = df.reset_index(drop=True).copy()
+    if meta is None:
+        meta = {"categorical": {}, "columns": None}
+
+    parts: list[pd.DataFrame] = []
+
+    if spec.linear:
+        x_cont = df[spec.linear].copy()
+        if scaler is None:
+            scaler = StandardScaler()
+        arr = scaler.fit_transform(x_cont) if fit_scaler else scaler.transform(x_cont)
+        x_scaled = pd.DataFrame(arr, columns=spec.linear, index=df.index)
+
+        for variable in spec.quadratic:
+            if variable not in x_scaled.columns:
+                raise KeyError(f"Quadratic term '{variable}' is not in spec.linear.")
+            x_scaled[f"{variable}__sq"] = x_scaled[variable] ** 2
+
+        for left, right in spec.interactions:
+            missing = [v for v in (left, right) if v not in x_scaled.columns]
+            if missing:
+                raise KeyError(f"Interaction {left!r} x {right!r} contains non-linear variables: {missing}")
+            x_scaled[f"{left}__x__{right}"] = x_scaled[left] * x_scaled[right]
+
+        parts.append(x_scaled)
+    else:
+        if scaler is None:
+            scaler = StandardScaler()
+
+    if spec.categorical:
+        if "used" not in df.columns and fit_scaler:
+            raise KeyError("Categorical encoding during fitting requires a 'used' column.")
+
+        available = df.loc[df.get("used", False) != True]
+        used = df.loc[df.get("used", False) == True]
+
+        for variable in spec.categorical:
+            if variable not in meta["categorical"]:
+                available_props = available[variable].value_counts(normalize=True, dropna=True)
+                keep_levels = available_props[available_props >= min_available_proportion].index.tolist()
+
+                used_counts = used[variable].value_counts(dropna=True)
+                keep_levels = [level for level in keep_levels if used_counts.get(level, 0) > 0]
+
+                if not keep_levels:
+                    raise ValueError(
+                        f"No levels of '{variable}' remain after requiring minimum availability "
+                        f"proportion {min_available_proportion} and at least one used point."
+                    )
+
+                reference = available_props.loc[keep_levels].idxmax()
+                ordered_levels = [reference] + [level for level in keep_levels if level != reference]
+                meta["categorical"][variable] = {
+                    "keep_levels": keep_levels,
+                    "reference": reference,
+                    "ordered_levels": ordered_levels,
+                }
+
+            info = meta["categorical"][variable]
+            series = df[variable].where(df[variable].isin(info["keep_levels"]), np.nan)
+            series = pd.Categorical(series, categories=info["ordered_levels"])
+            dummies = pd.get_dummies(series, prefix=variable, dtype=float, dummy_na=False)
+
+            reference_column = f"{variable}_{info['reference']}"
+            if reference_column in dummies.columns:
+                dummies = dummies.drop(columns=reference_column)
+
+            dummies.index = df.index
+            parts.append(dummies)
+
+    x = pd.concat(parts, axis=1) if parts else pd.DataFrame(index=df.index)
+    x = x.dropna(axis=0)
+    x = x.loc[:, x.nunique(dropna=False) > 1]
+
+    if spec.add_const:
+        x = sm.add_constant(x, has_constant="add")
+
+    if meta["columns"] is None:
+        meta["columns"] = x.columns.tolist()
+    else:
+        for column in meta["columns"]:
+            if column not in x.columns:
+                x[column] = 0.0
+        x = x[meta["columns"]]
+
+    return x, scaler, meta

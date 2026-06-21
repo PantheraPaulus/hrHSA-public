@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hsa"
+version = "0.1.0"
+description = "Habitat and resource selection analysis tools for telemetry and movement ecology."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+  { name = "Paul K" }
+]
+dependencies = [
+  "numpy",
+  "pandas",
+  "geopandas",
+  "xarray",
+  "rioxarray",
+  "scipy",
+  "scikit-learn",
+  "statsmodels",
+  "shapely",
+]
+
+[project.optional-dependencies]
+earthengine = ["earthengine-api", "geemap"]
+dask = ["dask[distributed]", "zarr"]
+dev = ["pytest", "ruff", "jupyter", "nbconvert"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+src = ["src"]

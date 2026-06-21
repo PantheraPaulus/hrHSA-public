@@ -1,0 +1,24 @@
+name: hsa
+channels:
+  - conda-forge
+dependencies:
+  - python>=3.10
+  - numpy
+  - pandas
+  - geopandas
+  - shapely
+  - scipy
+  - scikit-learn
+  - statsmodels
+  - xarray
+  - rioxarray
+  - rasterio
+  - pyogrio
+  - dask
+  - distributed
+  - zarr
+  - jupyter
+  - pip
+  - pip:
+      - earthengine-api
+      - geemap
