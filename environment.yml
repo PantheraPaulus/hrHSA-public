@@ -18,6 +18,7 @@ dependencies:
   - distributed
   - dask-jobqueue
   - zarr
+  - pyarrow
   - jupyter
   - pip
   - pip:
