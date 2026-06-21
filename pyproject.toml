@@ -26,7 +26,8 @@ dependencies = [
 [project.optional-dependencies]
 earthengine = ["earthengine-api", "geemap"]
 dask = ["dask[distributed]", "zarr"]
-hpc = ["dask[distributed]", "dask-jobqueue", "zarr"]
+hpc = ["dask[distributed]", "dask-jobqueue", "zarr", "pyarrow"]
+io = ["zarr", "pyarrow"]
 dev = ["pytest", "ruff", "jupyter", "nbconvert"]
 
 [tool.setuptools.packages.find]
