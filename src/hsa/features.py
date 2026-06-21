@@ -48,7 +48,9 @@ def build_design_matrix(
         for left, right in spec.interactions:
             missing = [v for v in (left, right) if v not in x_scaled.columns]
             if missing:
-                raise KeyError(f"Interaction {left!r} x {right!r} contains non-linear variables: {missing}")
+                raise KeyError(
+                    f"Interaction {left!r} x {right!r} contains non-linear variables: {missing}"
+                )
             x_scaled[f"{left}__x__{right}"] = x_scaled[left] * x_scaled[right]
 
         parts.append(x_scaled)
@@ -57,14 +59,19 @@ def build_design_matrix(
             scaler = StandardScaler()
 
     if spec.categorical:
-        if "used" not in df.columns and fit_scaler:
-            raise KeyError("Categorical encoding during fitting requires a 'used' column.")
-
-        available = df.loc[df.get("used", False) != True]
-        used = df.loc[df.get("used", False) == True]
-
         for variable in spec.categorical:
             if variable not in meta["categorical"]:
+                if not fit_scaler:
+                    raise ValueError(
+                        f"No categorical metadata found for '{variable}'. "
+                        "Pass metadata from fitting when predicting."
+                    )
+                if "used" not in df.columns:
+                    raise KeyError("Categorical encoding during fitting requires a 'used' column.")
+
+                available = df.loc[df["used"] != True]
+                used = df.loc[df["used"] == True]
+
                 available_props = available[variable].value_counts(normalize=True, dropna=True)
                 keep_levels = available_props[available_props >= min_available_proportion].index.tolist()
 
