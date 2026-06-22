@@ -61,6 +61,139 @@ def build_step_data(
     return g
 
 
+def build_displacement_velocity_data(
+    reloc_gdf,
+    *,
+    id_col: str = "Individual_ID",
+    timestamp_col: str = "Timestamp",
+    expected_interval_min: float | None = None,
+    tolerance_min: float = 2,
+):
+    """Build a step table with displacement and velocity vector components.
+
+    The input must be a projected GeoDataFrame, so x/y units are metric. Each
+    returned row represents the movement from the previous fix to the current
+    fix for the same individual.
+
+    Added columns include:
+    - ``x``, ``y``: current coordinates
+    - ``x_prev``, ``y_prev``: previous coordinates
+    - ``dx_m``, ``dy_m``: displacement vector components in metres
+    - ``vx_m_per_h``, ``vy_m_per_h``: velocity vector components
+    - ``speed_m_per_h``: scalar speed
+    - ``heading``: movement direction in radians
+    """
+
+    g = build_step_data(
+        reloc_gdf,
+        id_col=id_col,
+        timestamp_col=timestamp_col,
+        expected_interval_min=expected_interval_min,
+        tolerance_min=tolerance_min,
+    ).copy()
+
+    g["x"] = g.geometry.x
+    g["y"] = g.geometry.y
+    g["x_prev"] = g["previous_location"].x
+    g["y_prev"] = g["previous_location"].y
+
+    g["dx_m"] = g["x"] - g["x_prev"]
+    g["dy_m"] = g["y"] - g["y_prev"]
+    g["vx_m_per_h"] = g["dx_m"] / g["t_diff_h"]
+    g["vy_m_per_h"] = g["dy_m"] / g["t_diff_h"]
+    g["speed_m_per_h"] = np.hypot(g["vx_m_per_h"], g["vy_m_per_h"])
+    g["heading"] = np.arctan2(g["dy_m"], g["dx_m"])
+
+    g = g.replace([np.inf, -np.inf], np.nan)
+    g = g.dropna(subset=["dx_m", "dy_m", "vx_m_per_h", "vy_m_per_h", "heading"])
+    if g.empty:
+        raise ValueError("No valid displacement/velocity vectors available.")
+    return g
+
+
+def build_lagged_vector_pairs(
+    vector_df: pd.DataFrame,
+    *,
+    id_col: str = "Individual_ID",
+    timestamp_col: str = "Timestamp",
+    vector_cols: tuple[str, str] = ("vx_m_per_h", "vy_m_per_h"),
+    max_lag: str | pd.Timedelta = "48h",
+    lag_bin: str | pd.Timedelta = "1h",
+) -> pd.DataFrame:
+    """Create lagged vector pairs for empirical autocorrelation estimation.
+
+    Each returned row pairs one movement vector with a later movement vector
+    from the same individual. The dot product and cosine similarity are included
+    so downstream code can estimate how vector similarity declines with time lag.
+
+    This is intentionally a dataframe builder, not the final decorrelation-time
+    estimator. It belongs in ``geometry`` because it is purely geometric and
+    temporal preprocessing.
+    """
+
+    required = [id_col, timestamp_col, *vector_cols]
+    missing = [col for col in required if col not in vector_df.columns]
+    if missing:
+        raise ValueError(f"Missing required columns: {missing}")
+
+    max_lag_td = pd.Timedelta(max_lag)
+    lag_bin_td = pd.Timedelta(lag_bin)
+    if max_lag_td <= pd.Timedelta(0):
+        raise ValueError("max_lag must be positive.")
+    if lag_bin_td <= pd.Timedelta(0):
+        raise ValueError("lag_bin must be positive.")
+
+    vx, vy = vector_cols
+    rows = []
+    for animal_id, group in vector_df.sort_values([id_col, timestamp_col]).groupby(id_col):
+        g = group.reset_index(drop=True).copy()
+        times = pd.to_datetime(g[timestamp_col]).to_numpy(dtype="datetime64[ns]")
+        vec = g[[vx, vy]].to_numpy(dtype=float)
+        norms = np.linalg.norm(vec, axis=1)
+
+        for i in range(len(g) - 1):
+            dt = pd.to_timedelta(times[i + 1 :] - times[i])
+            within = np.where(dt <= max_lag_td)[0]
+            if within.size == 0:
+                continue
+
+            for offset in within:
+                j = i + 1 + int(offset)
+                norm_product = norms[i] * norms[j]
+                dot = float(np.dot(vec[i], vec[j]))
+                cosine = dot / norm_product if norm_product > 0 else np.nan
+                lag = pd.Timedelta(times[j] - times[i])
+                lag_bin_value = pd.to_timedelta(
+                    np.floor(lag / lag_bin_td) * lag_bin_td,
+                    unit="ns",
+                )
+
+                rows.append(
+                    {
+                        id_col: animal_id,
+                        "t0": pd.Timestamp(times[i]),
+                        "t1": pd.Timestamp(times[j]),
+                        "lag": lag,
+                        "lag_h": lag.total_seconds() / 3600.0,
+                        "lag_bin": lag_bin_value,
+                        "lag_bin_h": lag_bin_value.total_seconds() / 3600.0,
+                        f"{vx}_0": vec[i, 0],
+                        f"{vy}_0": vec[i, 1],
+                        f"{vx}_1": vec[j, 0],
+                        f"{vy}_1": vec[j, 1],
+                        "dot_product": dot,
+                        "cosine_similarity": cosine,
+                        "speed_0": norms[i],
+                        "speed_1": norms[j],
+                    }
+                )
+
+    out = pd.DataFrame(rows)
+    if out.empty:
+        raise ValueError("No lagged vector pairs found. Increase max_lag or check timestamps.")
+    return out
+
+
 def build_turn_angle_data(
     step_df,
     *,
