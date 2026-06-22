@@ -132,7 +132,8 @@ def spatial_summary(
             summary["effective_range"] = float(variogram.describe().get("effective_range", np.nan))
         except Exception as exc:
             summary["variogram_error"] = str(exc)
-
+        return summary, gdf, variogram
+    
     return summary, gdf
 
 
