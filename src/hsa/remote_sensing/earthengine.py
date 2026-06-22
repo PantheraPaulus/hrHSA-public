@@ -136,7 +136,6 @@ def spatial_summary(
     
     return summary, gdf
 
-
 def temporal_summary(
     image_collection,
     region,
@@ -148,35 +147,38 @@ def temporal_summary(
     cadence: str = "MS",
     projection: str = "EPSG:4326",
     reducers: Sequence[str] = ("mean", "median", "stdDev", "min", "max"),
+    verbose: bool = True,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Summarize temporal variability of an Earth Engine ImageCollection.
-
-    The collection is split into periods defined by ``cadence``. For each
-    period, the selected band is averaged across images first and then reduced
-    over ``region`` using the requested reducers.
-
-    The period loop is built server-side as an Earth Engine FeatureCollection,
-    so the function makes one client-side ``getInfo()`` call for all periods
-    rather than one call per period.
-
-    Returns
-    -------
-    wide, long:
-        A period-level table and a long-format table convenient for plotting.
-    """
 
     import ee
+    import time
+
+    def _log(msg: str):
+        if verbose:
+            print(msg, flush=True)
+
+    t_start_total = time.time()
+
+    _log("Preparing temporal summary...")
 
     start_ts = pd.Timestamp(start)
     end_ts = pd.Timestamp(end)
     edges = pd.date_range(start=start_ts, end=end_ts, freq=cadence)
+
     if len(edges) == 0 or edges[0] != start_ts:
         edges = edges.insert(0, start_ts)
     if edges[-1] < end_ts:
         edges = edges.append(pd.DatetimeIndex([end_ts]))
 
+    n_periods = len(edges) - 1
+    _log(f"Prepared {n_periods} periods from {start_ts.date()} to {end_ts.date()}.")
+
     if band is None:
+        _log("No band supplied; retrieving first band name from Earth Engine...")
         band = image_collection.first().bandNames().getInfo()[0]
+
+    _log(f"Using band: {band}")
+    _log(f"Reducers: {', '.join(reducers)}")
 
     reducer_map = {
         "mean": ee.Reducer.mean(),
@@ -186,13 +188,18 @@ def temporal_summary(
         "max": ee.Reducer.max(),
         "variance": ee.Reducer.variance(),
     }
+
     unknown = [name for name in reducers if name not in reducer_map]
     if unknown:
-        raise ValueError(f"Unsupported reducers: {unknown}. Choose from {sorted(reducer_map)}.")
+        raise ValueError(
+            f"Unsupported reducers: {unknown}. Choose from {sorted(reducer_map)}."
+        )
 
     reducer = reducer_map[reducers[0]]
     for name in reducers[1:]:
         reducer = reducer.combine(reducer_map[name], sharedInputs=True)
+
+    _log("Building server-side period FeatureCollection...")
 
     period_features = [
         ee.Feature(
@@ -204,13 +211,14 @@ def temporal_summary(
         )
         for t0, t1 in zip(edges[:-1], edges[1:])
     ]
-    periods = ee.FeatureCollection(period_features)
 
+    periods = ee.FeatureCollection(period_features)
     collection = image_collection.select(band)
 
     def summarize_period(feature):
         t0 = ee.Date(feature.get("period_start"))
         t1 = ee.Date(feature.get("period_end"))
+
         subset = collection.filterDate(t0, t1)
         n_images = subset.size()
 
@@ -229,38 +237,94 @@ def temporal_summary(
             )
         )
 
-        props = feature.toDictionary().combine(stats, True).set("n_images", n_images)
+        props = (
+            feature
+            .toDictionary()
+            .combine(stats, True)
+            .set("n_images", n_images)
+        )
+
         return ee.Feature(None, props)
 
+    _log(
+        "Submitting Earth Engine request. "
+        "This may take a while; Python cannot show per-period progress during getInfo()."
+    )
+
+    t0 = time.time()
     features = periods.map(summarize_period).getInfo()["features"]
+    _log(f"Earth Engine request finished in {(time.time() - t0):.1f} seconds.")
+
+    _log("Parsing returned period summaries...")
 
     rows = []
-    for feature in features:
+    for i, feature in enumerate(features, start=1):
         props = feature.get("properties", {})
+
         row = {
             "period_start": pd.Timestamp(props.get("period_start")),
             "period_end": pd.Timestamp(props.get("period_end")),
             "n_images": int(props.get("n_images", 0)),
         }
+
         for name in reducers:
             row[name] = props.get(f"{band}_{name}", props.get(name, np.nan))
+
         rows.append(row)
 
-    wide = pd.DataFrame(rows).sort_values("period_start").reset_index(drop=True)
-    wide["period_mid"] = wide["period_start"] + (wide["period_end"] - wide["period_start"]) / 2
-    wide["duration_days"] = (wide["period_end"] - wide["period_start"]).dt.total_seconds() / 86400.0
+        if verbose:
+            period_start = row["period_start"].date()
+            period_end = row["period_end"].date()
+            n_images = row["n_images"]
+            print(
+                f"Parsed {i}/{n_periods}: {period_start} to {period_end}, "
+                f"{n_images} images",
+                flush=True,
+            )
+
+    _log("Formatting output tables...")
+
+    wide = (
+        pd.DataFrame(rows)
+        .sort_values("period_start")
+        .reset_index(drop=True)
+    )
+
+    wide["period_mid"] = (
+        wide["period_start"]
+        + (wide["period_end"] - wide["period_start"]) / 2
+    )
+
+    wide["duration_days"] = (
+        wide["period_end"] - wide["period_start"]
+    ).dt.total_seconds() / 86400.0
 
     for name in reducers:
         wide[name] = pd.to_numeric(wide[name], errors="coerce")
         wide[f"{name}_diff"] = wide[name].diff()
+
         previous = wide[name].shift(1)
-        wide[f"{name}_pct_change"] = np.where(previous != 0, (wide[name] - previous) / previous, np.nan)
+        wide[f"{name}_pct_change"] = np.where(
+            previous != 0,
+            (wide[name] - previous) / previous,
+            np.nan,
+        )
 
     value_columns = list(reducers)
+
     long = wide.melt(
-        id_vars=["period_start", "period_end", "period_mid", "duration_days", "n_images"],
+        id_vars=[
+            "period_start",
+            "period_end",
+            "period_mid",
+            "duration_days",
+            "n_images",
+        ],
         value_vars=value_columns,
         var_name="statistic",
         value_name="value",
     )
+
+    _log(f"Done. Total runtime: {(time.time() - t_start_total):.1f} seconds.")
+
     return wide, long

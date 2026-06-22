@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 
 
+# TODO: Estimate decorrelation time 
 def prepare_trajectory_data(
     df: pd.DataFrame,
     *,
