@@ -154,6 +154,10 @@ def temporal_summary(
     period, the selected band is averaged across images first and then reduced
     over ``region`` using the requested reducers.
 
+    The period loop is built server-side as an Earth Engine FeatureCollection,
+    so the function makes one client-side ``getInfo()`` call for all periods
+    rather than one call per period.
+
     Returns
     -------
     wide, long:
@@ -189,30 +193,56 @@ def temporal_summary(
     for name in reducers[1:]:
         reducer = reducer.combine(reducer_map[name], sharedInputs=True)
 
+    period_features = [
+        ee.Feature(
+            None,
+            {
+                "period_start": pd.Timestamp(t0).isoformat(),
+                "period_end": pd.Timestamp(t1).isoformat(),
+            },
+        )
+        for t0, t1 in zip(edges[:-1], edges[1:])
+    ]
+    periods = ee.FeatureCollection(period_features)
+
+    collection = image_collection.select(band)
+
+    def summarize_period(feature):
+        t0 = ee.Date(feature.get("period_start"))
+        t1 = ee.Date(feature.get("period_end"))
+        subset = collection.filterDate(t0, t1)
+        n_images = subset.size()
+
+        stats = ee.Dictionary(
+            ee.Algorithms.If(
+                n_images.gt(0),
+                subset.mean().reduceRegion(
+                    reducer=reducer,
+                    geometry=region,
+                    scale=scale,
+                    crs=projection,
+                    maxPixels=1e9,
+                    bestEffort=True,
+                ),
+                ee.Dictionary(),
+            )
+        )
+
+        props = feature.toDictionary().combine(stats, True).set("n_images", n_images)
+        return ee.Feature(None, props)
+
+    features = periods.map(summarize_period).getInfo()["features"]
+
     rows = []
-    for t0, t1 in zip(edges[:-1], edges[1:]):
-        subset = image_collection.filterDate(ee.Date(t0.isoformat()), ee.Date(t1.isoformat())).select(band)
-        n_images = int(subset.size().getInfo())
-        row = {"period_start": t0, "period_end": t1, "n_images": n_images}
-
-        if n_images == 0:
-            for name in reducers:
-                row[name] = np.nan
-            rows.append(row)
-            continue
-
-        image = subset.mean()
-        stats = image.reduceRegion(
-            reducer=reducer,
-            geometry=region,
-            scale=scale,
-            crs=projection,
-            maxPixels=1e9,
-            bestEffort=True,
-        ).getInfo()
-
+    for feature in features:
+        props = feature.get("properties", {})
+        row = {
+            "period_start": pd.Timestamp(props.get("period_start")),
+            "period_end": pd.Timestamp(props.get("period_end")),
+            "n_images": int(props.get("n_images", 0)),
+        }
         for name in reducers:
-            row[name] = stats.get(f"{band}_{name}", stats.get(name, np.nan))
+            row[name] = props.get(f"{band}_{name}", props.get(name, np.nan))
         rows.append(row)
 
     wide = pd.DataFrame(rows).sort_values("period_start").reset_index(drop=True)
@@ -220,6 +250,7 @@ def temporal_summary(
     wide["duration_days"] = (wide["period_end"] - wide["period_start"]).dt.total_seconds() / 86400.0
 
     for name in reducers:
+        wide[name] = pd.to_numeric(wide[name], errors="coerce")
         wide[f"{name}_diff"] = wide[name].diff()
         previous = wide[name].shift(1)
         wide[f"{name}_pct_change"] = np.where(previous != 0, (wide[name] - previous) / previous, np.nan)
