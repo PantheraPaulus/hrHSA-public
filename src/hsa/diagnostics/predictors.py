@@ -125,6 +125,120 @@ def summarize_variable_use_available(
     return out[cols]
 
 
+def summarize_use_available_tests(
+    sampled: pd.DataFrame,
+    variables: str | Iterable[str] | None = None,
+    *,
+    used_col: str = "used",
+    id_col: str | None = None,
+    thresholds: float | dict[str, float] | None = None,
+    threshold_direction: str = ">",
+    alternative: str = "two-sided",
+    exclude_columns: Iterable[str] = (
+        "x",
+        "y",
+        "geometry",
+        "Timestamp",
+        "time_rounded",
+    ),
+) -> pd.DataFrame:
+    """Run used-vs-available tests for one or more sampled predictors.
+
+    This is a dataframe-level wrapper around ``summarize_variable_use_available``.
+    It accepts a wide sampled table, splits rows into used and available using
+    ``used_col``, and optionally calculates one table row per individual when
+    ``id_col`` is supplied.
+
+    Parameters
+    ----------
+    sampled:
+        Wide table containing predictor columns plus a Boolean used/available
+        column.
+    variables:
+        Predictor column name(s). If None, all numeric columns are tested except
+        metadata columns, ``used_col``, and ``id_col``.
+    used_col:
+        Boolean column where True marks used points and False marks available
+        points.
+    id_col:
+        Optional individual/grouping column. If supplied, tests are run within
+        each individual.
+    thresholds:
+        Optional scalar threshold applied to all variables, or a dict mapping
+        variable names to thresholds. Used to compute ``prop_used``,
+        ``prop_available``, and ``delta_prop``.
+    threshold_direction:
+        Direction for threshold proportions: one of ">", ">=", "<", "<=".
+    alternative:
+        Mann-Whitney U alternative: "two-sided", "less", or "greater".
+    exclude_columns:
+        Metadata columns to ignore when ``variables=None``.
+
+    Returns
+    -------
+    pandas.DataFrame
+        One row per variable, or one row per individual and variable when
+        ``id_col`` is supplied.
+    """
+
+    required = {used_col}
+    if id_col is not None:
+        required.add(id_col)
+    missing = required.difference(sampled.columns)
+    if missing:
+        raise ValueError(f"Missing required columns: {sorted(missing)}")
+
+    if variables is None:
+        excluded = set(exclude_columns)
+        excluded.add(used_col)
+        if id_col is not None:
+            excluded.add(id_col)
+
+        variables = [
+            col
+            for col in sampled.columns
+            if col not in excluded and pd.api.types.is_numeric_dtype(sampled[col])
+        ]
+    elif isinstance(variables, str):
+        variables = [variables]
+    else:
+        variables = list(variables)
+
+    if not variables:
+        raise ValueError("No predictor variables supplied or inferred.")
+
+    missing_variables = [var for var in variables if var not in sampled.columns]
+    if missing_variables:
+        raise ValueError(f"Variables not found in sampled.columns: {missing_variables}")
+
+    frames: list[pd.DataFrame] = []
+
+    for variable in variables:
+        if isinstance(thresholds, dict):
+            threshold = thresholds.get(variable)
+        else:
+            threshold = thresholds
+
+        frame = summarize_variable_use_available(
+            sampled,
+            variable=variable,
+            used_col=used_col,
+            id_col=id_col,
+            threshold=threshold,
+            threshold_direction=threshold_direction,
+            alternative=alternative,
+        )
+        frames.append(frame)
+
+    out = pd.concat(frames, ignore_index=True)
+
+    sort_cols = ["variable"]
+    if id_col is not None:
+        sort_cols = [id_col, "variable"]
+
+    return out.sort_values(sort_cols).reset_index(drop=True)
+
+
 def summarize_continuous(vals_used, vals_available) -> dict[str, Any]:
     """Summarize used-vs-available separation for one continuous predictor."""
 
