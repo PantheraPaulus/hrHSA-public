@@ -310,6 +310,7 @@ def sample_raster_stack(
     target_resolution: float | None = None,
     reducer: str = "mean",
     dtype: str = "float32",
+    id_cols: str | list[str] | tuple[str, ...] | None = None,
 ) -> pd.DataFrame:
     """Sample an xarray raster stack at point locations using nearest-neighbour lookup."""
 
@@ -320,12 +321,15 @@ def sample_raster_stack(
         env_crs = env.rio.crs
     except Exception:
         env_crs = None
+
     if env_crs is not None and samples.crs is not None and samples.crs != env_crs:
         samples = samples.to_crs(env_crs)
 
     env = env.transpose("band", "y", "x")
+
     xs = xr.DataArray(samples.geometry.x.to_numpy(), dims="points", name="x")
     ys = xr.DataArray(samples.geometry.y.to_numpy(), dims="points", name="y")
+
     sampled = env.sel(x=xs, y=ys, method="nearest").transpose("band", "points")
 
     arr = sampled.data
@@ -334,11 +338,25 @@ def sample_raster_stack(
 
     bands = [str(band) for band in sampled["band"].values]
     out = pd.DataFrame(arr.T, columns=bands, index=samples.index)
+
     out["x"] = xs.values
     out["y"] = ys.values
 
+    # Standard metadata columns
     for column in ("used", "Timestamp"):
         if column in samples.columns:
+            out[column] = samples[column].to_numpy()
+
+    # Optional ID / grouping columns
+    if id_cols is not None:
+        if isinstance(id_cols, str):
+            id_cols = [id_cols]
+
+        missing = [col for col in id_cols if col not in samples.columns]
+        if missing:
+            raise ValueError(f"id_cols not found in samples.columns: {missing}")
+
+        for column in id_cols:
             out[column] = samples[column].to_numpy()
 
     return out
