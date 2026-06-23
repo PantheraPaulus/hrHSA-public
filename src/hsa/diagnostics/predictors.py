@@ -30,6 +30,101 @@ def common_language_effect_size(vals_used, vals_available) -> float:
     return float(u_stat / (len(vals_used) * len(vals_available)))
 
 
+def summarize_variable_use_available(
+    sampled: pd.DataFrame,
+    variable: str,
+    *,
+    used_col: str = "used",
+    id_col: str | None = None,
+    threshold: float | None = None,
+    threshold_direction: str = ">",
+    alternative: str = "two-sided",
+) -> pd.DataFrame:
+    """Summarize one predictor for used and available samples.
+
+    The returned table contains sample sizes, proportions above/below a chosen
+    threshold, distribution summaries, the Mann-Whitney U statistic, its p-value,
+    and the common-language effect size (CLES), i.e. P(used > available).
+
+    If ``id_col`` is supplied, the summary is calculated separately for each
+    individual. Otherwise, a single pooled row is returned.
+    """
+
+    from scipy.stats import mannwhitneyu
+
+    required = {variable, used_col}
+    if id_col is not None:
+        required.add(id_col)
+    missing = required.difference(sampled.columns)
+    if missing:
+        raise ValueError(f"Missing required columns: {sorted(missing)}")
+
+    if threshold_direction not in {">", ">=", "<", "<="}:
+        raise ValueError("threshold_direction must be one of '>', '>=', '<', '<='.")
+
+    if alternative not in {"two-sided", "less", "greater"}:
+        raise ValueError("alternative must be one of 'two-sided', 'less', or 'greater'.")
+
+    def _clean(values) -> np.ndarray:
+        values = pd.to_numeric(values, errors="coerce").to_numpy(dtype=float)
+        return values[np.isfinite(values)]
+
+    def _prop(values: np.ndarray) -> float:
+        if threshold is None or values.size == 0:
+            return float(np.nan)
+        if threshold_direction == ">":
+            return float(np.mean(values > threshold))
+        if threshold_direction == ">=":
+            return float(np.mean(values >= threshold))
+        if threshold_direction == "<":
+            return float(np.mean(values < threshold))
+        return float(np.mean(values <= threshold))
+
+    def _one_group(group: pd.DataFrame, group_id=None) -> dict[str, Any]:
+        vals_used = _clean(group.loc[group[used_col] == True, variable])
+        vals_available = _clean(group.loc[group[used_col] != True, variable])
+
+        row: dict[str, Any] = {
+            "variable": variable,
+            "n_used": int(vals_used.size),
+            "n_available": int(vals_available.size),
+            "mean_used": float(np.mean(vals_used)) if vals_used.size else np.nan,
+            "mean_available": float(np.mean(vals_available)) if vals_available.size else np.nan,
+            "median_used": float(np.median(vals_used)) if vals_used.size else np.nan,
+            "median_available": float(np.median(vals_available)) if vals_available.size else np.nan,
+            "prop_used": _prop(vals_used),
+            "prop_available": _prop(vals_available),
+            "threshold": threshold,
+            "threshold_direction": threshold_direction if threshold is not None else None,
+            "mannwhitney_u": np.nan,
+            "mannwhitney_pvalue": np.nan,
+            "cles": np.nan,
+        }
+
+        if group_id is not None and id_col is not None:
+            row[id_col] = group_id
+
+        if vals_used.size > 0 and vals_available.size > 0:
+            test = mannwhitneyu(vals_used, vals_available, alternative=alternative)
+            row["mannwhitney_u"] = float(test.statistic)
+            row["mannwhitney_pvalue"] = float(test.pvalue)
+            row["cles"] = float(test.statistic / (vals_used.size * vals_available.size))
+
+        row["delta_mean"] = row["mean_used"] - row["mean_available"]
+        row["delta_median"] = row["median_used"] - row["median_available"]
+        row["delta_prop"] = row["prop_used"] - row["prop_available"]
+        row["cles_centered"] = abs(row["cles"] - 0.5) if np.isfinite(row["cles"]) else np.nan
+        return row
+
+    if id_col is None:
+        return pd.DataFrame([_one_group(sampled)])
+
+    rows = [_one_group(group, group_id) for group_id, group in sampled.groupby(id_col)]
+    out = pd.DataFrame(rows)
+    cols = [id_col] + [col for col in out.columns if col != id_col]
+    return out[cols]
+
+
 def summarize_continuous(vals_used, vals_available) -> dict[str, Any]:
     """Summarize used-vs-available separation for one continuous predictor."""
 
