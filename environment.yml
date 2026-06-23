@@ -12,6 +12,7 @@ dependencies:
   - skgstat
   - statsmodels
   - xarray
+  - xee
   - rioxarray
   - rasterio
   - pyogrio

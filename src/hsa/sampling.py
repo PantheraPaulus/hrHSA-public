@@ -6,69 +6,260 @@ import geopandas as gpd
 import xarray as xr
 
 
+import geopandas as gpd
+import pandas as pd
+
+
 def get_availability_domain(
     used: gpd.GeoDataFrame,
     *,
+    id_col: str | None = None,
     estimator: str = "mcp",
     quantile: float = 0.95,
+    min_points: int = 5,
+    keep_columns: bool = True,
 ) -> gpd.GeoDataFrame:
-    """Create an availability domain from used locations.
+    """
+    Create availability domain(s) from used locations.
 
-    Currently implements a centroid-trimmed MCP. This is intentionally simple;
-    project-specific domains such as reserve boundaries, home ranges, or buffers
-    can be passed directly to :func:`sample_available_points` instead.
+    If id_col is None, returns one population-level domain.
+    If id_col is supplied, returns one domain per individual.
+
+    Parameters
+    ----------
+    used:
+        GeoDataFrame of used locations.
+    id_col:
+        Optional individual ID column. If supplied, availability is estimated
+        separately per individual.
+    estimator:
+        Currently only "mcp".
+    quantile:
+        Quantile used for centroid-trimmed MCP.
+    min_points:
+        Minimum number of points required per domain.
+    keep_columns:
+        If True and id_col is supplied, include n_points and quantile metadata.
+
+    Returns
+    -------
+    GeoDataFrame
+        Availability polygons. If id_col is supplied, one row per individual.
     """
 
     if estimator.lower() != "mcp":
-        raise ValueError(f"Unsupported estimator: {estimator!r}. Currently only 'mcp' is implemented.")
+        raise ValueError(
+            f"Unsupported estimator: {estimator!r}. Currently only 'mcp' is implemented."
+        )
+
     if used.crs is None:
         raise ValueError("used.crs is None; set a CRS before defining availability.")
 
+    if id_col is not None and id_col not in used.columns:
+        raise ValueError(f"id_col={id_col!r} not found in used.columns.")
+
     original_crs = used.crs
-    used_metric = used if not original_crs.is_geographic else used.to_crs(used.estimate_utm_crs())
 
-    centroid = used_metric.geometry.union_all().centroid
-    tmp = used_metric.copy()
-    tmp["distance_to_centroid"] = tmp.geometry.distance(centroid)
-    keep = tmp["distance_to_centroid"] <= tmp["distance_to_centroid"].quantile(quantile)
-    hull = tmp.loc[keep].geometry.union_all().convex_hull
+    def _single_domain(g: gpd.GeoDataFrame):
+        if len(g) < min_points:
+            return None
 
-    domain = gpd.GeoDataFrame(geometry=[hull], crs=used_metric.crs)
-    return domain.to_crs(original_crs)
+        g_metric = g if not original_crs.is_geographic else g.to_crs(g.estimate_utm_crs())
+
+        centroid = g_metric.geometry.union_all().centroid
+
+        tmp = g_metric.copy()
+        tmp["distance_to_centroid"] = tmp.geometry.distance(centroid)
+
+        keep = (
+            tmp["distance_to_centroid"]
+            <= tmp["distance_to_centroid"].quantile(quantile)
+        )
+
+        kept = tmp.loc[keep]
+
+        if len(kept) < min_points:
+            return None
+
+        hull = kept.geometry.union_all().convex_hull
+        area_km2 = hull.area / 1_000_000
+
+        if hull.is_empty:
+            return None
+
+        return gpd.GeoDataFrame(
+            {
+                "n_points": [len(g)],
+                "n_points_used_for_hull": [len(kept)],
+                "quantile": [quantile],
+                "estimator": [estimator],
+                "area_km²": [area_km2]
+            },
+            geometry=[hull],
+            crs=g_metric.crs,
+        ).to_crs(original_crs)
+
+    # Population-level domain
+    if id_col is None:
+        domain = _single_domain(used)
+        if domain is None:
+            raise ValueError(
+                f"Could not estimate availability domain: fewer than {min_points} valid points."
+            )
+        return domain
+
+    # Individual-level domains
+    domains = []
+
+    for individual_id, group in used.groupby(id_col):
+        domain = _single_domain(group)
+
+        if domain is None:
+            continue
+
+        domain[id_col] = individual_id
+        domains.append(domain)
+
+    if not domains:
+        raise ValueError(
+            f"Could not estimate any individual domains. "
+            f"Check min_points={min_points}, quantile={quantile}, and id_col={id_col!r}."
+        )
+
+    out = pd.concat(domains, ignore_index=True)
+    out = gpd.GeoDataFrame(out, geometry="geometry", crs=original_crs)
+
+    # Put ID column first for readability
+    cols = [id_col] + [c for c in out.columns if c != id_col]
+    out = out[cols]
+
+    if not keep_columns:
+        out = out[[id_col, "geometry"]]
+
+    return out
+
+
+import geopandas as gpd
+import pandas as pd
 
 
 def sample_available_points(
     domain: gpd.GeoDataFrame,
-    n: int,
+    n: int | None = None,
     used: gpd.GeoDataFrame | None = None,
     *,
+    id_col: str | None = None,
+    n_per_used: int | None = None,
     seed: int = 42,
     timestamp_col: str = "Timestamp",
+    keep_domain_columns: bool = False,
 ) -> gpd.GeoDataFrame:
-    """Sample available points and optionally append used points."""
+    """
+    Sample available points and optionally append used points.
+
+    If id_col is None:
+        sample n points from the whole domain.
+
+    If id_col is supplied:
+        domain must contain one row per individual/domain.
+        available points are sampled separately inside each individual's domain.
+        If used is supplied, used points are matched by id_col and appended.
+    """
 
     if domain.crs is None:
         raise ValueError("domain.crs is None; set a CRS before sampling available points.")
 
-    available = gpd.GeoDataFrame(
-        geometry=domain.sample_points(n, rng=seed).explode(index_parts=True),
-        crs=domain.crs,
-    ).reset_index(drop=True)
-    available[timestamp_col] = None
-    available["used"] = False
+    if id_col is not None and id_col not in domain.columns:
+        raise ValueError(f"id_col={id_col!r} not found in domain.columns.")
 
-    if used is None:
-        return available
+    if used is not None:
+        if used.crs is None:
+            raise ValueError("used.crs is None; set a CRS before appending used points.")
+        if used.crs != domain.crs:
+            used = used.to_crs(domain.crs)
+        if id_col is not None and id_col not in used.columns:
+            raise ValueError(f"id_col={id_col!r} not found in used.columns.")
 
-    if used.crs is None:
-        raise ValueError("used.crs is None; set a CRS before appending used points.")
-    if used.crs != domain.crs:
-        used = used.to_crs(domain.crs)
+    # ------------------------------------------------------------
+    # Population-level sampling
+    # ------------------------------------------------------------
+    if id_col is None:
+        if n is None:
+            raise ValueError("n must be supplied when id_col is None.")
 
-    used_min = used[[timestamp_col, "geometry"]].copy()
-    used_min["used"] = True
+        available = gpd.GeoDataFrame(
+            geometry=domain.sample_points(n, rng=seed).explode(index_parts=True),
+            crs=domain.crs,
+        ).reset_index(drop=True)
 
-    samples = pd.concat([used_min, available], ignore_index=True)
+        available[timestamp_col] = None
+        available["used"] = False
+
+        if used is None:
+            return available
+
+        used_min = used[[timestamp_col, "geometry"]].copy()
+        used_min["used"] = True
+
+        samples = pd.concat([used_min, available], ignore_index=True)
+        return gpd.GeoDataFrame(samples, geometry="geometry", crs=domain.crs)
+
+    # ------------------------------------------------------------
+    # Individual-level sampling
+    # ------------------------------------------------------------
+    frames = []
+
+    for i, domain_row in domain.reset_index(drop=True).iterrows():
+        individual_id = domain_row[id_col]
+
+        domain_i = gpd.GeoDataFrame(
+            [domain_row],
+            geometry="geometry",
+            crs=domain.crs,
+        )
+
+        used_i = None
+        if used is not None:
+            used_i = used.loc[used[id_col] == individual_id].copy()
+
+        if n_per_used is not None:
+            if used_i is None:
+                raise ValueError("n_per_used requires used to be supplied.")
+            n_i = len(used_i) * n_per_used
+        elif n is not None:
+            n_i = n
+        else:
+            raise ValueError("Supply either n or n_per_used.")
+
+        if n_i <= 0:
+            continue
+
+        available_i = gpd.GeoDataFrame(
+            geometry=domain_i.sample_points(n_i, rng=seed + i).explode(index_parts=True),
+            crs=domain.crs,
+        ).reset_index(drop=True)
+
+        available_i[id_col] = individual_id
+        available_i[timestamp_col] = None
+        available_i["used"] = False
+
+        if keep_domain_columns:
+            for col in domain.columns:
+                if col not in {id_col, "geometry"}:
+                    available_i[col] = domain_row[col]
+
+        frames.append(available_i)
+
+        if used_i is not None and not used_i.empty:
+            used_cols = [id_col, timestamp_col, "geometry"]
+            used_min = used_i[used_cols].copy()
+            used_min["used"] = True
+            frames.append(used_min)
+
+    if not frames:
+        raise ValueError("No available points were sampled. Check domains, n, and n_per_used.")
+
+    samples = pd.concat(frames, ignore_index=True)
     return gpd.GeoDataFrame(samples, geometry="geometry", crs=domain.crs)
 
 

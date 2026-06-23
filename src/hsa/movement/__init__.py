@@ -19,4 +19,6 @@ __all__ = [
     "fit_step_distribution",
     "fit_turn_angle_distribution",
     "fit_movement_kernel_per_id",
+    "build_displacement_velocity_data",
+    "build_lagged_vector_pairs"
 ]

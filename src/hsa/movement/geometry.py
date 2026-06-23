@@ -2,34 +2,77 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+import geopandas as gpd
+from shapely import wkt
+import geopandas as gpd
+import pandas as pd
 
 
-# TODO: Estimate decorrelation time 
 def prepare_trajectory_data(
     df: pd.DataFrame,
     *,
     id_col: str = "Individual_ID",
     timestamp_col: str = "Timestamp",
+    geometry_col: str | None = "geometry",
+    lon_col: str | None = None,
+    lat_col: str | None = None,
+    source_crs: str | int = "EPSG:4326",
+    target_crs: str | int | None = "EPSG:32733",
     round_freq: str | None = "h",
     drop_duplicate_fixes: bool = True,
-) -> pd.DataFrame:
-    """Prepare relocation records for step and turn-angle calculations."""
+) -> gpd.GeoDataFrame:
+    """Prepare relocation records as a projected GeoDataFrame for movement analysis."""
 
     g = df.copy()
+
     missing = [col for col in (id_col, timestamp_col) if col not in g.columns]
     if missing:
         raise ValueError(f"Missing required columns: {missing}")
 
+    if geometry_col is not None and geometry_col in g.columns:
+        g[geometry_col] = g[geometry_col].apply(
+                lambda x: wkt.loads(x) if pd.notna(x) else None
+            )
+        g = gpd.GeoDataFrame(g, geometry=geometry_col, crs=getattr(df, "crs", None) or source_crs)
+
+    elif lon_col is not None and lat_col is not None:
+        missing_xy = [col for col in (lon_col, lat_col) if col not in g.columns]
+        if missing_xy:
+            raise ValueError(f"Missing coordinate columns: {missing_xy}")
+
+        g = g.dropna(subset=[lon_col, lat_col])
+        g = gpd.GeoDataFrame(
+            g,
+            geometry=gpd.points_from_xy(g[lon_col], g[lat_col]),
+            crs=source_crs,
+        )
+
+    else:
+        raise ValueError(
+            "Provide either a valid geometry_col or both lon_col and lat_col."
+        )
+
     g[timestamp_col] = pd.to_datetime(g[timestamp_col], errors="coerce")
-    g = g.dropna(subset=[id_col, timestamp_col])
+    g = g.dropna(subset=[id_col, timestamp_col, g.geometry.name])
+
+    if g.crs is None:
+        g = g.set_crs(source_crs)
+
+    if target_crs is not None:
+        g = g.to_crs(target_crs)
 
     if round_freq is not None:
         g["time_rounded"] = g[timestamp_col].dt.floor(round_freq)
+
         if drop_duplicate_fixes:
             g = g.drop_duplicates([id_col, "time_rounded"], keep="first")
 
-    return g.sort_values([id_col, timestamp_col]).reset_index(drop=True)
+    g = g.sort_values([id_col, timestamp_col]).reset_index(drop=True)
 
+    g.attrs["source_crs"] = source_crs
+    g.attrs["target_crs"] = target_crs
+
+    return g
 
 def build_step_data(
     reloc_gdf,
