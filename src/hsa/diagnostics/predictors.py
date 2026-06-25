@@ -125,120 +125,6 @@ def summarize_variable_use_available(
     return out[cols]
 
 
-def summarize_use_available_tests(
-    sampled: pd.DataFrame,
-    variables: str | Iterable[str] | None = None,
-    *,
-    used_col: str = "used",
-    id_col: str | None = None,
-    thresholds: float | dict[str, float] | None = None,
-    threshold_direction: str = ">",
-    alternative: str = "two-sided",
-    exclude_columns: Iterable[str] = (
-        "x",
-        "y",
-        "geometry",
-        "Timestamp",
-        "time_rounded",
-    ),
-) -> pd.DataFrame:
-    """Run used-vs-available tests for one or more sampled predictors.
-
-    This is a dataframe-level wrapper around ``summarize_variable_use_available``.
-    It accepts a wide sampled table, splits rows into used and available using
-    ``used_col``, and optionally calculates one table row per individual when
-    ``id_col`` is supplied.
-
-    Parameters
-    ----------
-    sampled:
-        Wide table containing predictor columns plus a Boolean used/available
-        column.
-    variables:
-        Predictor column name(s). If None, all numeric columns are tested except
-        metadata columns, ``used_col``, and ``id_col``.
-    used_col:
-        Boolean column where True marks used points and False marks available
-        points.
-    id_col:
-        Optional individual/grouping column. If supplied, tests are run within
-        each individual.
-    thresholds:
-        Optional scalar threshold applied to all variables, or a dict mapping
-        variable names to thresholds. Used to compute ``prop_used``,
-        ``prop_available``, and ``delta_prop``.
-    threshold_direction:
-        Direction for threshold proportions: one of ">", ">=", "<", "<=".
-    alternative:
-        Mann-Whitney U alternative: "two-sided", "less", or "greater".
-    exclude_columns:
-        Metadata columns to ignore when ``variables=None``.
-
-    Returns
-    -------
-    pandas.DataFrame
-        One row per variable, or one row per individual and variable when
-        ``id_col`` is supplied.
-    """
-
-    required = {used_col}
-    if id_col is not None:
-        required.add(id_col)
-    missing = required.difference(sampled.columns)
-    if missing:
-        raise ValueError(f"Missing required columns: {sorted(missing)}")
-
-    if variables is None:
-        excluded = set(exclude_columns)
-        excluded.add(used_col)
-        if id_col is not None:
-            excluded.add(id_col)
-
-        variables = [
-            col
-            for col in sampled.columns
-            if col not in excluded and pd.api.types.is_numeric_dtype(sampled[col])
-        ]
-    elif isinstance(variables, str):
-        variables = [variables]
-    else:
-        variables = list(variables)
-
-    if not variables:
-        raise ValueError("No predictor variables supplied or inferred.")
-
-    missing_variables = [var for var in variables if var not in sampled.columns]
-    if missing_variables:
-        raise ValueError(f"Variables not found in sampled.columns: {missing_variables}")
-
-    frames: list[pd.DataFrame] = []
-
-    for variable in variables:
-        if isinstance(thresholds, dict):
-            threshold = thresholds.get(variable)
-        else:
-            threshold = thresholds
-
-        frame = summarize_variable_use_available(
-            sampled,
-            variable=variable,
-            used_col=used_col,
-            id_col=id_col,
-            threshold=threshold,
-            threshold_direction=threshold_direction,
-            alternative=alternative,
-        )
-        frames.append(frame)
-
-    out = pd.concat(frames, ignore_index=True)
-
-    sort_cols = ["variable"]
-    if id_col is not None:
-        sort_cols = [id_col, "variable"]
-
-    return out.sort_values(sort_cols).reset_index(drop=True)
-
-
 def summarize_continuous(vals_used, vals_available) -> dict[str, Any]:
     """Summarize used-vs-available separation for one continuous predictor."""
 
@@ -502,3 +388,206 @@ def inspect_predictors(
                 plot_continuous_ecdfs(variable, subset, row, used_col=used_col, value_col=value_col)
 
     return summary
+
+def inspect_sampled_use_available(
+    sampled: pd.DataFrame,
+    columns: str | Iterable[str] | None = None,
+    *,
+    used_col: str = "used",
+    id_col: str | None = None,
+    exclude_columns: Iterable[str] = (
+        "x",
+        "y",
+        "geometry",
+        "Timestamp",
+        "time_rounded",
+    ),
+    sort_by: str = "ks_stat",
+    ascending: bool = False,
+    plot: bool = True,
+    plot_top_n: int | None = None,
+    figsize: tuple[float, float] = (12, 4),
+) -> dict[str, Any]:
+    """Inspect continuous used-vs-available predictors from a sampled wide table.
+
+    Parameters
+    ----------
+    sampled:
+        Wide sampled table, e.g. columns such as predictors, x, y, used,
+        Timestamp, Individual_ID.
+    columns:
+        Predictor columns to inspect. If None, all numeric columns are used
+        except metadata columns.
+    used_col:
+        Boolean column where True = used and False = available.
+    id_col:
+        Optional individual ID column. If supplied, statistics are calculated
+        by individual, but plots remain pooled.
+    exclude_columns:
+        Metadata columns ignored when columns=None.
+    sort_by:
+        Summary column used for sorting.
+    ascending:
+        Sort direction.
+    plot:
+        Whether to create pooled ECDF plots.
+    plot_top_n:
+        If supplied, only plot the top n predictors after pooled sorting.
+    figsize:
+        Figure size for each predictor plot.
+
+    Returns
+    -------
+    dict
+        {
+            "stats": statistics table,
+            "pooled_stats": pooled statistics table,
+            "figures": dict of variable -> (fig, axes)
+        }
+    """
+
+    required = {used_col}
+    if id_col is not None:
+        required.add(id_col)
+
+    missing = required.difference(sampled.columns)
+    if missing:
+        raise ValueError(f"Missing required columns: {sorted(missing)}")
+
+    # ------------------------------------------------------------
+    # Infer predictor columns
+    # ------------------------------------------------------------
+    if columns is None:
+        excluded = set(exclude_columns)
+        excluded.add(used_col)
+
+        if id_col is not None:
+            excluded.add(id_col)
+
+        columns = [
+            col
+            for col in sampled.columns
+            if col not in excluded
+            and pd.api.types.is_numeric_dtype(sampled[col])
+        ]
+
+    elif isinstance(columns, str):
+        columns = [columns]
+
+    else:
+        columns = list(columns)
+
+    if not columns:
+        raise ValueError("No predictor columns supplied or inferred.")
+
+    missing_columns = [col for col in columns if col not in sampled.columns]
+    if missing_columns:
+        raise ValueError(f"Predictor columns not found in sampled: {missing_columns}")
+
+    # ------------------------------------------------------------
+    # Helper: summarize one variable for one dataframe
+    # ------------------------------------------------------------
+    def _summarize_one(df: pd.DataFrame, variable: str) -> dict[str, Any]:
+        vals_used = df.loc[df[used_col] == True, variable].to_numpy()
+        vals_available = df.loc[df[used_col] != True, variable].to_numpy()
+
+        stats = summarize_continuous(vals_used, vals_available)
+        stats["variable"] = variable
+
+        return stats
+
+    # ------------------------------------------------------------
+    # Pooled statistics
+    # ------------------------------------------------------------
+    pooled_rows = [
+        _summarize_one(sampled, variable)
+        for variable in columns
+    ]
+
+    pooled_stats = pd.DataFrame(pooled_rows)
+
+    if "delta_median" in pooled_stats.columns:
+        pooled_stats["abs_delta_median"] = pooled_stats["delta_median"].abs()
+    if "delta_mean" in pooled_stats.columns:
+        pooled_stats["abs_delta_mean"] = pooled_stats["delta_mean"].abs()
+    if "cles" in pooled_stats.columns:
+        pooled_stats["cles_centered"] = (pooled_stats["cles"] - 0.5).abs()
+
+    if sort_by not in pooled_stats.columns:
+        raise ValueError(
+            f"sort_by={sort_by!r} not found in pooled_stats columns: "
+            f"{list(pooled_stats.columns)}"
+        )
+
+    pooled_stats = (
+        pooled_stats
+        .sort_values(sort_by, ascending=ascending)
+        .reset_index(drop=True)
+    )
+
+    # ------------------------------------------------------------
+    # Individual-level statistics, if requested
+    # ------------------------------------------------------------
+    if id_col is None:
+        stats = pooled_stats.copy()
+
+    else:
+        rows = []
+
+        for individual_id, group in sampled.groupby(id_col):
+            for variable in columns:
+                row = _summarize_one(group, variable)
+                row[id_col] = individual_id
+                rows.append(row)
+
+        stats = pd.DataFrame(rows)
+
+        if "delta_median" in stats.columns:
+            stats["abs_delta_median"] = stats["delta_median"].abs()
+        if "delta_mean" in stats.columns:
+            stats["abs_delta_mean"] = stats["delta_mean"].abs()
+        if "cles" in stats.columns:
+            stats["cles_centered"] = (stats["cles"] - 0.5).abs()
+
+        stats = (
+            stats
+            .sort_values([id_col, sort_by], ascending=[True, ascending])
+            .reset_index(drop=True)
+        )
+
+    # ------------------------------------------------------------
+    # Pooled plots
+    # ------------------------------------------------------------
+    figures = {}
+
+    if plot:
+        plot_variables = pooled_stats["variable"].tolist()
+
+        if plot_top_n is not None:
+            plot_variables = plot_variables[:plot_top_n]
+
+        for variable in plot_variables:
+            pooled_row = pooled_stats.loc[
+                pooled_stats["variable"] == variable
+            ].iloc[0]
+
+            subset = sampled[[used_col, variable]].rename(
+                columns={variable: "value"}
+            )
+
+            fig, axes = plot_continuous_ecdfs(
+                variable,
+                subset,
+                pooled_row,
+                used_col=used_col,
+                value_col="value",
+                figsize=figsize,
+            )
+
+            figures[variable] = (fig, axes)
+
+    return {
+        "stats": stats,
+        "pooled_stats": pooled_stats,
+        "figures": figures,
+    }

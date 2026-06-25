@@ -7,8 +7,8 @@ from hsa.diagnostics.predictors import (
     plot_continuous_ecdfs,
     summarize_categorical,
     summarize_continuous,
-    summarize_use_available_tests,
     summarize_variable_use_available,
+    inspect_sampled_use_available
 )
 
 __all__ = [
@@ -18,6 +18,6 @@ __all__ = [
     "plot_continuous_ecdfs",
     "summarize_categorical",
     "summarize_continuous",
-    "summarize_use_available_tests",
     "summarize_variable_use_available",
+    "inspect_sampled_use_available"
 ]

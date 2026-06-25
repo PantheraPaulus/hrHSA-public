@@ -27,7 +27,7 @@ def fit_rsf(
     if clean:
         candidate_cols = ["used", *spec.linear, *spec.categorical]
         candidate_cols = [col for col in candidate_cols if col in df.columns]
-        df = df.replace([np.inf, -np.inf], np.nan).dropna(subset=candidate_cols)
+        df = df.replace([np.inf, -np.inf], np.nan).dropna(subset=candidate_cols).reset_index(drop = True)
 
     x, scaler, meta = build_design_matrix(
         df,

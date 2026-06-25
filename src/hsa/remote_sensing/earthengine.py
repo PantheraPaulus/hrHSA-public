@@ -35,6 +35,7 @@ def ee_image_to_xarray_stack(image, *, geometry, crs: str, scale: float):
 
     ds = geemap.ee_to_xarray(image, crs=crs, scale=scale, geometry=geometry)
     ds0 = ds.isel(time=0, drop=True) #.rename({"X": "x", "Y": "y"})
+    ds0 = ds0.chunk({"y": 1024, "x": 1024}) # TODO: heuristic
     return ds0.to_array(dim="band").transpose("band", "y", "x")
 
 
