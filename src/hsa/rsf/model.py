@@ -45,18 +45,28 @@ def fit_rsf(
 def predict_rsf_points(
     df: pd.DataFrame,
     model,
-    scaler: StandardScaler,
+    scaler,
     spec: FeatureSpec,
     meta: dict[str, Any],
     *,
     pred_col: str = "rsf_pred",
 ) -> pd.DataFrame:
-    """Predict relative RSF values for a point-level dataframe."""
+    """Predict relative selection scores for point samples."""
 
-    x, _, _ = build_design_matrix(df, spec, scaler=scaler, fit_scaler=False, meta=meta)
+    df = df.reset_index(drop=True).copy()
+
+    x, _, _ = build_design_matrix(
+        df,
+        spec,
+        scaler=scaler,
+        fit_scaler=False,
+        meta=meta,
+    )
+
     x = x[model.params.index]
     eta = model.predict(x, which="linear")
 
     out = df.loc[x.index].copy()
     out[pred_col] = np.exp(eta).to_numpy()
+
     return out

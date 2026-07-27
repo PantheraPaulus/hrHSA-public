@@ -9,7 +9,6 @@ dependencies:
   - shapely
   - scipy
   - scikit-learn
-  - skgstat
   - statsmodels
   - xarray
   - xee

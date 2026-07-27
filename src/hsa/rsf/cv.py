@@ -10,7 +10,7 @@ from hsa.types import FoldSplit, FeatureSpec
 from hsa.sampling import get_availability_domain, sample_available_points, sample_raster_stack
 from hsa.rsf.model import fit_rsf, predict_rsf_points
 from hsa.rsf.surface import predict_rsf_surface
-from hsa.rsf.validation import boyce_quantile_bins
+from hsa.rsf.validation import boyce_quantile_bins, boyce_sliding_window
 
 
 def assign_week_folds(reloc: gpd.GeoDataFrame, *, k: int = 5, seed: int = 42) -> gpd.GeoDataFrame:
@@ -106,3 +106,340 @@ def cross_validate_rsf_temporal(
         rows.append({"fold": fold, "boyce": boyce, "n_train": len(split.train_thin), "n_test": len(split.test)})
 
     return pd.DataFrame(rows)
+
+
+def _select_heldout_individuals(
+    ids: Iterable,
+    *,
+    heldout: str | int | float | Iterable = "all",
+    seed: int = 42,
+) -> list:
+    """Select individuals for leave-one-individual-out validation."""
+
+    ids = pd.Index(pd.Series(list(ids)).dropna().unique()).tolist()
+
+    if heldout == "all":
+        return ids
+
+    if isinstance(heldout, int):
+        if heldout <= 0:
+            raise ValueError("heldout as int must be positive.")
+        n = min(heldout, len(ids))
+
+    elif isinstance(heldout, float):
+        if not 0 < heldout <= 1:
+            raise ValueError("heldout as float must be in (0, 1].")
+        n = max(1, int(np.ceil(len(ids) * heldout)))
+
+    else:
+        selected = list(heldout)
+        missing = sorted(set(selected).difference(ids))
+        if missing:
+            raise ValueError(f"Held-out IDs not found in data: {missing}")
+        return selected
+
+    rng = np.random.default_rng(seed)
+    return rng.choice(ids, size=n, replace=False).tolist()
+
+
+def _domains_by_id(
+    used: gpd.GeoDataFrame,
+    *,
+    id_col: str = "Individual_ID",
+    domain: gpd.GeoDataFrame | None = None,
+    quantile: float = 0.95,
+) -> dict[Any, gpd.GeoDataFrame]:
+    """Create one availability domain per individual."""
+
+    domains = {}
+
+    for individual_id, g in used.groupby(id_col):
+        if domain is None:
+            domains[individual_id] = get_availability_domain(
+                g,
+                estimator="mcp",
+                quantile=quantile,
+            )
+        else:
+            dom = domain.copy()
+            if dom.crs != g.crs:
+                dom = dom.to_crs(g.crs)
+            domains[individual_id] = dom
+
+    return domains
+
+
+def _extract_predictor_cols(spec: FeatureSpec) -> list[str]:
+    cols = []
+    cols.extend(getattr(spec, "linear", []) or [])
+    cols.extend(getattr(spec, "quadratic", []) or [])
+    cols.extend(getattr(spec, "categorical", []) or [])
+
+    for a, b in getattr(spec, "interactions", []) or []:
+        cols.extend([a, b])
+
+    return list(dict.fromkeys(cols))
+
+
+def leave_one_individual_out_rsf(
+    reloc: gpd.GeoDataFrame,
+    env,
+    spec: FeatureSpec,
+    *,
+    id_col: str = "Individual_ID",
+    heldout: str | int | float | Iterable = "all",
+    domain: gpd.GeoDataFrame | None = None,
+    domain_quantile: float = 0.95,
+    thin_train_dt: str | None = "12h",
+    thin_test_dt: str | None = None,
+    sampling_factor_train: int = 10,
+    balance_train: bool = False,
+    n_background_boyce: int = 100_000,
+    n_bins: int = 20,
+    seed: int = 42,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Leave-one-individual-out RSF validation.
+
+    For each held-out individual, the model is trained on all other individuals,
+    with available points sampled within each training individual's own domain.
+    Evaluation is performed on the held-out individual's used points, and Boyce
+    background points are sampled from the held-out individual's domain.
+
+    Returns
+    -------
+    summary, params, boyce_bins:
+        Fold-level validation summary, fitted coefficient table, and long-format
+        Boyce-bin diagnostics.
+    """
+
+    if id_col not in reloc.columns:
+        raise KeyError(f"{id_col!r} not found in reloc.")
+
+    if "Timestamp" not in reloc.columns:
+        raise KeyError("'Timestamp' column is required.")
+
+    if reloc.crs is None:
+        raise ValueError("reloc.crs is None; set a CRS before validation.")
+
+    diagnostics = {}
+    
+    g = reloc.copy()
+    g["Timestamp"] = pd.to_datetime(g["Timestamp"], errors="coerce")
+    g = g.dropna(subset=[id_col, "Timestamp", "geometry"]).copy()
+
+    ids_to_holdout = _select_heldout_individuals(
+        g[id_col].unique(),
+        heldout=heldout,
+        seed=seed,
+    )
+
+    domains = _domains_by_id(
+        g,
+        id_col=id_col,
+        domain=domain,
+        quantile=domain_quantile,
+    )
+
+    rows = []
+    param_rows = []
+    boyce_rows = []
+
+    for fold_id, heldout_id in enumerate(ids_to_holdout):
+        train_used = g.loc[g[id_col] != heldout_id].copy()
+        test_used = g.loc[g[id_col] == heldout_id].copy()
+
+        if train_used.empty or test_used.empty:
+            rows.append(
+                {
+                    "heldout_ID": heldout_id,
+                    "boyce": np.nan,
+                    "n_train_used": len(train_used),
+                    "n_test_used": len(test_used),
+                    "error": "empty train or test set",
+                }
+            )
+            continue
+
+        train_parts = []
+
+        for j, (train_id, train_i) in enumerate(train_used.groupby(id_col)):
+            train_i = train_i.copy()
+
+            if thin_train_dt is not None:
+                train_i = thin_by_time(train_i, min_dt=thin_train_dt)
+
+            n_available = len(train_i) * sampling_factor_train
+            if n_available == 0:
+                continue
+
+            samples_i = sample_available_points(
+                domains[train_id],
+                n_available,
+                used=train_i,
+                seed=seed + 10_000 * fold_id + j,
+                timestamp_col="Timestamp",
+            )
+
+            samples_i[id_col] = train_id
+            train_parts.append(samples_i)
+
+        if not train_parts:
+            rows.append(
+                {
+                    "heldout_ID": heldout_id,
+                    "boyce": np.nan,
+                    "n_train_used": len(train_used),
+                    "n_test_used": len(test_used),
+                    "error": "no training samples generated",
+                }
+            )
+            continue
+
+        train_samples = gpd.GeoDataFrame(
+            pd.concat(train_parts, ignore_index=True),
+            geometry="geometry",
+            crs=g.crs,
+        )
+
+        if balance_train:
+            train_samples = _balance_used_available_by_id(
+                train_samples,
+                id_col=id_col,
+                used_col="used",
+                seed=seed + 99 * fold_id,
+            )
+
+        train_df = sample_raster_stack(train_samples, env)
+
+        model, scaler, fitted_spec, meta = fit_rsf(train_df, spec)
+
+        # Store coefficients
+        coef = model.params.copy()
+        bse = getattr(model, "bse", pd.Series(index=coef.index, data=np.nan))
+        pvals = getattr(model, "pvalues", pd.Series(index=coef.index, data=np.nan))
+
+        param_row = {"heldout_ID": heldout_id}
+        for name, value in coef.items():
+            param_row[f"beta_{name}"] = float(value)
+        for name, value in bse.items():
+            param_row[f"se_{name}"] = float(value) if pd.notna(value) else np.nan
+        for name, value in pvals.items():
+            param_row[f"p_{name}"] = float(value) if pd.notna(value) else np.nan
+        param_rows.append(param_row)
+
+        # Predict RSF surface
+        rsf = predict_rsf_surface(
+            env,
+            model,
+            scaler,
+            fitted_spec,
+            meta,
+        )
+
+        # Evaluate held-out individual
+        test_eval = test_used.copy()
+        if thin_test_dt is not None:
+            test_eval = thin_by_time(test_eval, min_dt=thin_test_dt)
+
+        test_eval["used"] = True
+        test_df = sample_raster_stack(test_eval, env)
+        test_df = test_df.replace([np.inf, -np.inf], np.nan)
+
+        predictor_cols = _extract_predictor_cols(fitted_spec)
+        predictor_cols = [col for col in predictor_cols if col in test_df.columns]
+        test_df = test_df.dropna(subset=predictor_cols)
+
+        test_pred = predict_rsf_points(
+            test_df,
+            model,
+            scaler,
+            fitted_spec,
+            meta,
+        )
+
+        boyce, bins = boyce_sliding_window(
+            test_pred,
+            rsf,
+            domains[heldout_id],
+            n_background_points=n_background_boyce,
+            #n_bins=n_bins,
+            seed=seed + 20_000 * fold_id,
+        )
+
+        bins = bins.copy()
+        bins["heldout_ID"] = heldout_id
+        bins["fold"] = fold_id
+        bins["boyce"] = float(boyce)
+        boyce_rows.append(bins)
+
+        rows.append(
+            {
+                "fold": fold_id,
+                "heldout_ID": heldout_id,
+                "boyce": float(boyce),
+                "n_train_used": int(len(train_used)),
+                "n_train_samples": int(len(train_samples)),
+                "n_test_used": int(len(test_used)),
+                "n_test_eval": int(len(test_df)),
+                "error": None,
+            }
+        )
+
+        diagnostics[heldout_id] = {
+            "rsf": rsf,
+            "domain": domains[heldout_id],
+            "test_points": test_eval.copy(),
+            "test_pred": test_pred.copy(),
+            "boyce_bins": bins.copy(),
+        }
+
+    summary = pd.DataFrame(rows)
+    params = pd.DataFrame(param_rows)
+    boyce_bins = (
+        pd.concat(boyce_rows, ignore_index=True)
+        if boyce_rows
+        else pd.DataFrame()
+    )
+
+    return summary, params, boyce_bins, diagnostics
+
+
+def _balance_used_available_by_id(
+    samples: gpd.GeoDataFrame,
+    *,
+    id_col: str = "Individual_ID",
+    used_col: str = "used",
+    seed: int = 42,
+) -> gpd.GeoDataFrame:
+    """Downsample each individual to its minimum used/available class size."""
+
+    rng = np.random.default_rng(seed)
+    parts = []
+
+    for _, g in samples.groupby(id_col):
+        used = g.loc[g[used_col] == True]
+        available = g.loc[g[used_col] != True]
+
+        n = min(len(used), len(available))
+        if n == 0:
+            continue
+
+        used_i = used.sample(
+            n=n,
+            random_state=int(rng.integers(0, 1_000_000)),
+        )
+        avail_i = available.sample(
+            n=n,
+            random_state=int(rng.integers(0, 1_000_000)),
+        )
+
+        parts.append(pd.concat([used_i, avail_i], ignore_index=True))
+
+    if not parts:
+        return samples.iloc[0:0].copy()
+
+    return gpd.GeoDataFrame(
+        pd.concat(parts, ignore_index=True),
+        geometry="geometry",
+        crs=samples.crs,
+    )

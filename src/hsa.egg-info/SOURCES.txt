@@ -13,6 +13,8 @@ src/hsa/compute/__init__.py
 src/hsa/compute/chunking.py
 src/hsa/compute/dask.py
 src/hsa/compute/io.py
+src/hsa/diagnostics/__init__.py
+src/hsa/diagnostics/predictors.py
 src/hsa/movement/__init__.py
 src/hsa/movement/distributions.py
 src/hsa/movement/geometry.py

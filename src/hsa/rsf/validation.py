@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 from scipy.stats import spearmanr
-
+import matplotlib.pyplot as plt
 from hsa.sampling import sample_available_points, sample_raster_stack
 
 
@@ -99,3 +99,135 @@ def boyce_sliding_window(
         return np.nan, chart
     boyce, _ = spearmanr(chart["rsf_mid"], chart["pe"])
     return float(boyce), chart
+
+def plot_boyce_values(
+    summary: pd.DataFrame,
+    *,
+    id_col: str = "heldout_ID",
+    boyce_col: str = "boyce",
+    sort: bool = True,
+    ax=None,
+    figsize: tuple[float, float] = (9, 4),
+    title: str = "Boyce validation by held-out individual",
+):
+    """Plot Boyce index values by fold or held-out individual."""
+
+    df = summary.copy()
+    df = df.loc[df[boyce_col].notna()].copy()
+
+    if sort:
+        df = df.sort_values(boyce_col)
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
+    else:
+        fig = ax.figure
+
+    x = np.arange(len(df))
+
+    ax.bar(x, df[boyce_col].to_numpy(dtype=float))
+    ax.axhline(0, linewidth=1)
+    ax.axhline(df[boyce_col].mean(), linestyle="--", linewidth=1)
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(df[id_col].astype(str), rotation=45, ha="right")
+    ax.set_ylabel("Boyce index")
+    ax.set_xlabel(id_col)
+    ax.set_title(title)
+
+    ax.text(
+        0.99,
+        0.02,
+        f"mean = {df[boyce_col].mean():.3f}",
+        transform=ax.transAxes,
+        ha="right",
+        va="bottom",
+    )
+
+    fig.tight_layout()
+    return fig, ax
+
+def plot_boyce_curves(
+    boyce_bins: pd.DataFrame,
+    *,
+    id_col: str = "heldout_ID",
+    x_col: str = "rsf_mid",
+    y_col: str = "pe",
+    show_points: bool = True,
+    show_reference: bool = True,
+    log_x: bool = False,
+    ax=None,
+    figsize: tuple[float, float] = (7, 5),
+    title: str = "Boyce calibration curves",
+    alpha: float = 0.45,
+    legend: bool | str = "auto",
+):
+    """Plot Boyce calibration curves.
+
+    Expects output from ``boyce_quantile_bins`` or ``boyce_sliding_window``.
+    If multiple held-out individuals are present, one curve is drawn per ID.
+    """
+
+    df = boyce_bins.copy()
+
+    missing = [col for col in (x_col, y_col) if col not in df.columns]
+    if missing:
+        raise KeyError(
+            f"Missing required columns: {missing}. "
+            f"Available columns are: {list(df.columns)}"
+        )
+
+    df = df.replace([np.inf, -np.inf], np.nan).dropna(subset=[x_col, y_col])
+
+    if df.empty:
+        raise ValueError("No finite Boyce-bin values available for plotting.")
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
+    else:
+        fig = ax.figure
+
+    if id_col in df.columns:
+        groups = df.groupby(id_col)
+    else:
+        groups = [(None, df)]
+
+    for individual_id, g in groups:
+        g = g.sort_values(x_col)
+
+        label = str(individual_id) if individual_id is not None else None
+
+        ax.plot(
+            g[x_col].to_numpy(dtype=float),
+            g[y_col].to_numpy(dtype=float),
+            linewidth=1,
+            alpha=alpha,
+            label=label,
+        )
+
+        if show_points:
+            ax.scatter(
+                g[x_col].to_numpy(dtype=float),
+                g[y_col].to_numpy(dtype=float),
+                s=20,
+                alpha=alpha,
+            )
+
+    if show_reference:
+        ax.axhline(1, linestyle="--", linewidth=1)
+
+    if log_x:
+        ax.set_xscale("log")
+
+    ax.set_xlabel("Log RSF score" if x_col == "rsf_mid" else x_col)
+    ax.set_ylabel("Predicted/expected ratio" if y_col == "pe" else y_col)
+    ax.set_title(title)
+
+    if legend == "auto":
+        legend = id_col in df.columns and df[id_col].nunique() <= 12
+
+    if legend:
+        ax.legend(title=id_col, bbox_to_anchor=(1.02, 1), loc="upper left")
+
+    fig.tight_layout()
+    return fig, ax
