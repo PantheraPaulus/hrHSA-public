@@ -4,9 +4,17 @@
 
 # HSA
 
-Python package skeleton for **Habitat / Resource Selection Analysis** and related movement-modelling workflows.
+**hrRSF** is a scalable Python toolkit for statistical inference on movement in heterogeneous spatial systems. It combines trajectory data with environmental covariates to estimate how local spatial structure influences the probability distribution of observed positions through resource selection, spatial point-process, and movement models. While originally developed for habitat and resource selection analyses in wildlife telemetry, the underlying framework addresses the more general problem of inferring interactions between moving entities and complex spatial fields. The package emphasizes reproducible workflows, computational efficiency, and scalable analyses of large telemetry and raster datasets, making it suitable for applications ranging from ecology and geospatial science to computational statistics and high-performance computing.
 
-The package is intended to provide a standardized workflow to perform Resource Selection Analysis, optionally extended toward Step Selection Analysis and simulation on larger telemetry and environmental datasets.
+Core capabilities
+-----------------
+• High-resolution Resource Selection Functions (RSFs)
+• Step Selection Functions (SSFs)
+• Spatial point-process modelling
+• Bayesian and likelihood-based inference
+• Large-scale telemetry and raster processing
+• Movement simulation and prediction
+• Reproducible HPC-ready geospatial workflows
 
 ## Current structure
 
