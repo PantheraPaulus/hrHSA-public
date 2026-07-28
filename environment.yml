@@ -3,7 +3,7 @@ channels:
   - conda-forge
 dependencies:
   - python>=3.10
-  - numpy
+  - numpy<=2.4
   - pandas
   - geopandas
   - shapely
@@ -23,6 +23,7 @@ dependencies:
   - jupyter
   - pip
   - seaborn
+  - pymc
   - pip:
       - earthengine-api
       - geemap
