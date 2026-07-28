@@ -22,6 +22,7 @@ dependencies:
   - pyarrow
   - jupyter
   - pip
+  - seaborn
   - pip:
       - earthengine-api
       - geemap

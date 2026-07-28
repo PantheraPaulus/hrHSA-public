@@ -233,7 +233,7 @@ def _fit_one_linear_candidate(
 
 def evaluate_linear_candidates_up_to_k(
     df: pd.DataFrame,
-    predictor_cols: Iterable[str],
+    predictor_cols: Iterable[str] | None = None,
     *,
     max_k: int = 3,
     n_jobs: int = 1,
@@ -248,9 +248,10 @@ def evaluate_linear_candidates_up_to_k(
     Set ``n_jobs`` > 1 to evaluate combinations in parallel using joblib.
     """
 
+    if predictor_cols is None:
+        predictor_cols = select_predictor_columns(df)
+
     predictor_cols = [col for col in predictor_cols if col in df.columns]
-    if not predictor_cols:
-        raise ValueError("No supplied predictor columns were found in df.columns.")
 
     combos: list[tuple[str, ...]] = []
     for k in range(1, min(len(predictor_cols), max_k) + 1):
