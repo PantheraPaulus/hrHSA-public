@@ -21,9 +21,9 @@ sys.path.insert(0, str(SOURCE_DIRECTORY))
 # Project information
 # ---------------------------------------------------------------------------
 
-project = "hrRSF"
-copyright = "2026, Paul K."
-author = "Paul K."
+project = "hrHSA"
+copyright = "2026 MolZoo"
+author = "Paul Kasko, Lubov Kabo, and Ralph Kühn"
 release = "0.1.0"
 
 
@@ -68,7 +68,7 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 html_theme = "pydata_sphinx_theme"
 
-html_title = "hrRSF documentation"
+html_title = "hrHSA"
 
 html_theme_options = {
     "show_toc_level": 2,
@@ -82,6 +82,10 @@ html_theme_options = {
             "icon": "fa-brands fa-github",
         }
     ],
+}
+
+html_sidebars = {
+    "**": [],
 }
 
 html_static_path = ["_static"]
