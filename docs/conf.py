@@ -22,7 +22,7 @@ sys.path.insert(0, str(SOURCE_DIRECTORY))
 # ---------------------------------------------------------------------------
 
 project = "hrHSA"
-copyright = "2026 MolZoo"
+copyright = "Kasko & Kühn, 2026"
 author = "Paul Kasko, Lubov Kabo, and Ralph Kühn"
 release = "0.1.0"
 
@@ -78,7 +78,7 @@ html_theme_options = {
     "icon_links": [
         {
             "name": "GitHub",
-            "url": "https://github.com/YOUR-GITHUB-NAME/YOUR-REPOSITORY",
+            "url": "https://github.com/PantheraPaulus/hrHSA-public",
             "icon": "fa-brands fa-github",
         }
     ],
