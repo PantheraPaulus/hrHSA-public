@@ -497,7 +497,7 @@ Such contrasts remain directly interpretable. The long-term consequences of the 
 Predicted utilisation distributions, residence times, crossing probabilities and home-range geometry should consequently be obtained through simulation of the complete transition process. At each step, candidate movements are drawn from the fitted movement kernel, weighted according to habitat, and sampled to produce the next location. Repetition generates trajectories whose emergent spatial patterns can be compared with held-out observations.
 
 RSFs, SSFs and iSSFs therefore represent a progression in the treatment of availability. An RSF relates use to a broader and approximately static available distribution. An SSF conditions availability upon the animal's previous location. An iSSF jointly estimates the movement process generating those local alternatives and the habitat-selection process distinguishing among them. The appropriate framework depends upon the temporal scale of the data and the inferential question being addressed.
-# Towards Bayesian Inference
+## Towards Bayesian Inference
 
 The preceding models commonly proceed as though recorded locations were exact, environmental covariates were known without error, individuals differed only through random sampling, and habitat-selection relationships remained constant through time. Each assumption is convenient; none is generally true. A Bayesian analysis is not the only means of relaxing them, but it provides a coherent framework in which uncertain observations, latent ecological processes, individual heterogeneity and temporal change may be represented jointly and propagated into the final inference.
 
