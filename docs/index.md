@@ -1,4 +1,4 @@
-# hrRSF
+# hrHSA
 
 **hrHSA** *(high-resolution Habitat Selection Analysis)* is a scalable Python framework for rigorous statistical inference on spatially distributed observations. It integrates positional data with environmental covariates to quantify how heterogeneous spatial fields, individual variation, and changing conditions shape the probability distribution of observed locations. The framework combines resource-selection analysis, spatial point-process models, hierarchical Bayesian inference, and mechanistic simulation, with explicit treatment of availability, observation processes, uncertainty, validation, and prediction.
 

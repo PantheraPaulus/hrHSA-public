@@ -41,6 +41,8 @@
     <script src="_static/documentation_options.js?v=38b66d78"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'implementation';</script>
     <script>DOCUMENTATION_OPTIONS.search_as_you_type = false;</script>
     <link rel="canonical" href="/implementation.html" />
@@ -393,6 +395,206 @@
                   
   <section class="tex2jax_ignore mathjax_ignore" id="implementation">
 <h1>Implementation<a class="headerlink" href="#implementation" title="Link to this heading">#</a></h1>
+<section id="design-principles">
+<h2>Design Principles<a class="headerlink" href="#design-principles" title="Link to this heading">#</a></h2>
+<p><strong>hrHSA</strong> is implemented as a scientific software package rather than as a collection of study-specific scripts. Its architecture is guided by four principles:</p>
+<ol class="arabic simple">
+<li><p><strong>Reproducibility</strong> — every transformation between the original data and the final inference should be explicit and recoverable.</p></li>
+<li><p><strong>Modularity</strong> — data preparation, feature construction, statistical inference, validation and prediction should remain separable.</p></li>
+<li><p><strong>Efficiency</strong> — computational resources should be used deliberately, with particular attention to memory access, spatial chunking and repeated raster operations.</p></li>
+<li><p><strong>Scalability</strong> — the same analytical workflow should run on a notebook, a multicore workstation or a SLURM-managed computing cluster.</p></li>
+</ol>
+<p>The resulting workflow separates scientific decisions from computational execution:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>telemetry and environmental data
+        ↓
+spatial standardisation
+        ↓
+definition and sampling of availability
+        ↓
+environmental feature extraction
+        ↓
+model-matrix construction
+        ↓
+statistical inference
+        ↓
+validation and diagnostics
+        ↓
+spatial prediction or movement simulation
+</pre></div>
+</div>
+<p>Each stage exposes a limited interface and may be inspected, tested or replaced independently.</p>
+</section>
+<section id="package-architecture">
+<h2>Package Architecture<a class="headerlink" href="#package-architecture" title="Link to this heading">#</a></h2>
+<p>The source code follows the conventional Python <code class="docutils literal notranslate"><span class="pre">src</span></code> layout and is divided according to analytical responsibility:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>src/hsa/
+├── sampling.py          # availability domains and raster sampling
+├── features.py          # reproducible construction of model matrices
+├── types.py             # shared specifications and data containers
+├── rsf/                 # fitting, prediction, validation and cross-validation
+├── movement/            # trajectories, steps, angles and movement kernels
+├── remote_sensing/      # optional Earth Observation interfaces
+├── compute/             # chunking, scalable I/O and distributed execution
+└── simulation/          # forward movement simulation
+</pre></div>
+</div>
+<p>The package itself remains independent of particular species, reserves, local file systems or Earth Engine projects. Study-specific assumptions belong in configuration files, examples or downstream analyses. This distinction allows empirical workflows to remain fully documented without embedding them in the reusable statistical core.</p>
+<p>Optional functionality is separated into dependency groups. A minimal installation provides the numerical and geospatial foundations of the package, while Earth Engine, distributed computation and HPC support may be installed only where required:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>.
+pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[earthengine]&quot;</span>
+pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[hpc,io]&quot;</span>
+</pre></div>
+</div>
+<p>Optional libraries are imported lazily inside the functions that require them. Importing <strong>hrHSA</strong> therefore neither initialises external services nor imposes a distributed-computing environment upon smaller analyses.</p>
+</section>
+<section id="reproducible-model-construction">
+<h2>Reproducible Model Construction<a class="headerlink" href="#reproducible-model-construction" title="Link to this heading">#</a></h2>
+<p>A fitted model is defined not only by its coefficients, but also by the transformations applied before estimation. <strong>hrHSA</strong> represents these transformations through a declarative <code class="docutils literal notranslate"><span class="pre">FeatureSpec</span></code>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">hsa</span><span class="w"> </span><span class="kn">import</span> <span class="n">FeatureSpec</span>
+
+<span class="n">spec</span> <span class="o">=</span> <span class="n">FeatureSpec</span><span class="p">(</span>
+    <span class="n">linear</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;ndvi&quot;</span><span class="p">,</span> <span class="s2">&quot;distance_to_water&quot;</span><span class="p">],</span>
+    <span class="n">quadratic</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;distance_to_water&quot;</span><span class="p">],</span>
+    <span class="n">interactions</span><span class="o">=</span><span class="p">[(</span><span class="s2">&quot;ndvi&quot;</span><span class="p">,</span> <span class="s2">&quot;distance_to_water&quot;</span><span class="p">)],</span>
+    <span class="n">categorical</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;landcover&quot;</span><span class="p">],</span>
+    <span class="n">add_const</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>Continuous predictors are standardised during fitting. Quadratic and interaction terms are then constructed on the standardised scale. Categorical levels, reference categories and final column order are stored as model metadata.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">model</span><span class="p">,</span> <span class="n">scaler</span><span class="p">,</span> <span class="n">spec</span><span class="p">,</span> <span class="n">meta</span> <span class="o">=</span> <span class="n">fit_rsf</span><span class="p">(</span><span class="n">samples</span><span class="p">,</span> <span class="n">spec</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The model, fitted scaler, feature specification and metadata jointly constitute the fitted analysis. Passing the same objects to validation and prediction ensures that raster surfaces and held-out observations receive precisely the transformations used during model fitting.</p>
+<p>Randomised operations accept explicit seeds. Coordinate reference systems are checked before spatial operations, and functions involving distances require projected coordinates with meaningful linear units. Invalid inputs are rejected early rather than being allowed to produce numerically plausible but ecologically incorrect results.</p>
+</section>
+<section id="geospatial-data-and-scalable-i-o">
+<h2>Geospatial Data and Scalable I/O<a class="headerlink" href="#geospatial-data-and-scalable-i-o" title="Link to this heading">#</a></h2>
+<p>Telemetry locations are represented as <code class="docutils literal notranslate"><span class="pre">GeoDataFrame</span></code> objects, while environmental fields are stored as labelled <code class="docutils literal notranslate"><span class="pre">xarray</span></code> arrays. A conventional environmental stack has the dimensions</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>band × y × x
+</pre></div>
+</div>
+<p>and retains its coordinates, projection, spatial resolution and band names throughout the workflow.</p>
+<p>Large raster stacks may be stored as <strong>Zarr</strong>, preserving multidimensional structure and supporting parallel access:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">hsa.compute</span><span class="w"> </span><span class="kn">import</span> <span class="n">write_raster_stack_zarr</span>
+
+<span class="n">write_raster_stack_zarr</span><span class="p">(</span>
+    <span class="n">env</span><span class="p">,</span>
+    <span class="s2">&quot;environment.zarr&quot;</span><span class="p">,</span>
+    <span class="n">target_chunk_mb</span><span class="o">=</span><span class="mi">128</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>Large sampled point tables may be stored as <strong>Parquet</strong>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">hsa.compute</span><span class="w"> </span><span class="kn">import</span> <span class="n">write_table_parquet</span>
+
+<span class="n">write_table_parquet</span><span class="p">(</span><span class="n">samples</span><span class="p">,</span> <span class="s2">&quot;samples.parquet&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>These intermediate products separate expensive environmental processing from statistical fitting. An analysis can therefore be repeated with a different model specification without downloading, transforming and sampling the complete environmental dataset again.</p>
+</section>
+<section id="chunking-and-memory-management">
+<h2>Chunking and Memory Management<a class="headerlink" href="#chunking-and-memory-management" title="Link to this heading">#</a></h2>
+<p>High-resolution analyses commonly exceed available memory long before they exceed available computing power. <strong>hrHSA</strong> therefore partitions raster and point operations into manageable blocks.</p>
+<p>For a raster containing <span class="math notranslate nohighlight">\(B\)</span> bands, spatial chunk dimensions <span class="math notranslate nohighlight">\(n_x\)</span> and <span class="math notranslate nohighlight">\(n_y\)</span>, and elements requiring <span class="math notranslate nohighlight">\(d\)</span> bytes, the approximate memory occupied by one chunk is</p>
+<div class="math notranslate nohighlight">
+\[
+M_{\mathrm{chunk}}
+=
+B n_x n_y d.
+\]</div>
+<p>The package provides heuristics for selecting approximately square spatial chunks under a specified memory target. Point extraction is similarly divided into batches whose size depends upon the number of environmental bands and their numeric precision.</p>
+<p>These heuristics provide conservative starting values rather than universal optima. Suitable chunk sizes depend upon the storage system, network throughput, worker memory and downstream operation. Computationally demanding analyses should therefore be benchmarked under realistic conditions.</p>
+</section>
+<section id="distributed-and-hpc-execution">
+<h2>Distributed and HPC Execution<a class="headerlink" href="#distributed-and-hpc-execution" title="Link to this heading">#</a></h2>
+<p>Distributed execution is provided through <strong>Dask</strong>. The statistical and geospatial functions remain independent of the scheduler, allowing the same analysis to operate under different computational backends.</p>
+<p>A local client may be created for notebook or workstation analyses:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">hsa.compute</span><span class="w"> </span><span class="kn">import</span> <span class="n">make_local_dask_client</span>
+
+<span class="n">client</span> <span class="o">=</span> <span class="n">make_local_dask_client</span><span class="p">(</span>
+    <span class="n">n_workers</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span>
+    <span class="n">threads_per_worker</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">local_directory</span><span class="o">=</span><span class="s2">&quot;/tmp/hsa-dask&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>On a SLURM-managed cluster, the computational backend may be replaced without altering the scientific workflow:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">dask.distributed</span><span class="w"> </span><span class="kn">import</span> <span class="n">Client</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">hsa.compute</span><span class="w"> </span><span class="kn">import</span> <span class="n">make_slurm_cluster</span>
+
+<span class="n">cluster</span> <span class="o">=</span> <span class="n">make_slurm_cluster</span><span class="p">(</span>
+    <span class="n">queue</span><span class="o">=</span><span class="s2">&quot;general&quot;</span><span class="p">,</span>
+    <span class="n">cores</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+    <span class="n">processes</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+    <span class="n">memory</span><span class="o">=</span><span class="s2">&quot;32GB&quot;</span><span class="p">,</span>
+    <span class="n">walltime</span><span class="o">=</span><span class="s2">&quot;04:00:00&quot;</span><span class="p">,</span>
+    <span class="n">scale_jobs</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">client</span> <span class="o">=</span> <span class="n">Client</span><span class="p">(</span><span class="n">cluster</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Worker-memory thresholds are configured explicitly so that intermediate data may spill to local storage before workers exhaust their available memory. Large raster stacks can be persisted across workers when they are accessed repeatedly, and temporary data can be directed to node-local scratch storage.</p>
+<p>External services require explicit worker initialisation. Google Earth Engine, for example, maintains process-local state and must be initialised separately on each distributed worker. <strong>hrHSA</strong> exposes this operation directly rather than relying upon hidden state inherited from the client process.</p>
+</section>
+<section id="statistical-validation">
+<h2>Statistical Validation<a class="headerlink" href="#statistical-validation" title="Link to this heading">#</a></h2>
+<p>Validation is part of the implementation rather than an optional final step. The package supports temporally blocked cross-validation and leave-one-individual-out validation, together with Boyce-index and calibration diagnostics.</p>
+<p>Temporal blocks reduce leakage between neighbouring relocations, while leave-one-individual-out validation tests whether a model transfers to animals not represented during fitting. In the latter case, training availability is generated separately within each training animal’s domain, and the held-out animal is evaluated relative to its own availability.</p>
+<p>Validation returns fold-specific coefficients, predictions, surfaces, Boyce diagnostics, calibration tables and sample sizes. Retaining these outputs permits individual failures and unstable coefficients to be examined instead of concealing them within a single pooled score.</p>
+<p>Movement modules provide trajectory preparation, step-length and turning-angle calculation, and estimation of empirical movement distributions by individual. These components supply the movement information required by subsequent SSF and iSSF workflows.</p>
+</section>
+<section id="bayesian-and-simulation-extensions">
+<h2>Bayesian and Simulation Extensions<a class="headerlink" href="#bayesian-and-simulation-extensions" title="Link to this heading">#</a></h2>
+<p>The package architecture is intended to support hierarchical Bayesian inference and large stochastic simulation ensembles. Feature construction, environmental sampling and validation are kept independent of the fitting backend so that likelihood-based estimation may be supplemented by PyMC- or JAX-based models without rebuilding the complete geospatial workflow.</p>
+<p>Gradient-based algorithms such as Hamiltonian Monte Carlo and the No-U-Turn Sampler are particularly suitable for the high-dimensional and correlated parameter spaces produced by hierarchical habitat-selection models (Hoffman &amp; Gelman, 2014; Betancourt, 2017). Independent chains can be distributed across processes or nodes, while automatic differentiation and just-in-time compilation may accelerate repeated likelihood evaluation.</p>
+<p>Forward simulations provide a second level of parallelism. Independent trajectories or posterior simulations may be distributed among workers, while the candidate steps within each trajectory can be evaluated through vectorised array operations.</p>
+<p>The present package provides the geospatial, movement and distributed-computing foundations for these extensions. Fully integrated Bayesian fitting and habitat-biased forward simulation remain developing components and are kept distinct from the stable RSF implementation.</p>
+</section>
+<section id="documentation-and-quality-assurance">
+<h2>Documentation and Quality Assurance<a class="headerlink" href="#documentation-and-quality-assurance" title="Link to this heading">#</a></h2>
+<p>The documentation is built with <strong>Sphinx</strong> and <strong>MyST Markdown</strong>, providing mathematical notation, automatically generated API references and versioned narrative documentation. Package configuration is maintained in <code class="docutils literal notranslate"><span class="pre">pyproject.toml</span></code>, with explicit core, optional and development dependencies.</p>
+<p>The current test suite verifies the public import surface and provides a foundation for continued quality assurance. Release hardening should additionally include:</p>
+<ul class="simple">
+<li><p>unit tests for spatial and statistical functions;</p></li>
+<li><p>regression tests for stable numerical outputs;</p></li>
+<li><p>synthetic parameter-recovery experiments;</p></li>
+<li><p>end-to-end workflow tests;</p></li>
+<li><p>and benchmarks of runtime, memory use and scaling efficiency.</p></li>
+</ul>
+<p>Scientific verification must accompany software verification. A function may execute correctly while implementing an inappropriate availability domain, temporal scale or ecological model.</p>
+</section>
+<section id="reproducibility">
+<h2>Reproducibility<a class="headerlink" href="#reproducibility" title="Link to this heading">#</a></h2>
+<p>A reproducible <strong>hrHSA</strong> analysis should preserve:</p>
+<ul class="simple">
+<li><p>package and dependency versions;</p></li>
+<li><p>coordinate reference systems and raster grains;</p></li>
+<li><p>the definition of availability;</p></li>
+<li><p>random seeds and sampling ratios;</p></li>
+<li><p>the feature specification and preprocessing metadata;</p></li>
+<li><p>fitted models and diagnostic outputs;</p></li>
+<li><p>cross-validation partitions;</p></li>
+<li><p>and the environmental products, or immutable references, from which predictors were derived.</p></li>
+</ul>
+<p>Reproducibility is therefore treated as part of the analytical design rather than as an administrative addition made after the analysis is complete.</p>
+</section>
+<section id="summary">
+<h2>Summary<a class="headerlink" href="#summary" title="Link to this heading">#</a></h2>
+<p><strong>hrHSA</strong> combines an accessible Python interface with a modular architecture for high-resolution telemetry and environmental data. Declarative model specifications, labelled geospatial arrays, memory-aware batching, chunked storage, structured validation and interchangeable local or SLURM-backed execution allow the same scientific workflow to operate across different computational scales.</p>
+<p>The purpose of this architecture is not parallelism for its own sake. It is to ensure that increasing spatial resolution, study extent and model complexity does not require a corresponding loss of transparency, reproducibility or ecological rigour.</p>
+</section>
+<section id="principal-references">
+<h2>Principal References<a class="headerlink" href="#principal-references" title="Link to this heading">#</a></h2>
+<p>Betancourt, M. (2017). A conceptual introduction to Hamiltonian Monte Carlo. <em>arXiv</em>, 1701.02434.</p>
+<p>Hoffman, M. D. &amp; Gelman, A. (2014). The No-U-Turn Sampler: adaptively setting path lengths in Hamiltonian Monte Carlo. <em>Journal of Machine Learning Research</em>, <strong>15</strong>, 1593–1623.</p>
+<p>Hoyer, S. &amp; Hamman, J. J. (2017). xarray: N-D labelled arrays and datasets in Python. <em>Journal of Open Research Software</em>, <strong>5</strong>, 10.</p>
+<p>Rocklin, M. (2015). Dask: parallel computation with blocked algorithms and task scheduling. <em>Proceedings of the 14th Python in Science Conference</em>, 130–136.</p>
+<p>Sandve, G. K., Nekrutenko, A., Taylor, J. &amp; Hovig, E. (2013). Ten simple rules for reproducible computational research. <em>PLoS Computational Biology</em>, <strong>9</strong>, e1003285.</p>
+<p>Wilkinson, M. D. et al. (2016). The FAIR Guiding Principles for scientific data management and stewardship. <em>Scientific Data</em>, <strong>3</strong>, 160018.</p>
+<p>Wilson, G. et al. (2017). Good enough practices in scientific computing. <em>PLoS Computational Biology</em>, <strong>13</strong>, e1005510.</p>
+</section>
 </section>
 
 
@@ -433,6 +635,29 @@
                 <dialog id="pst-secondary-sidebar-modal"></dialog>
                 <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
 
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav id="pst-page-toc-nav" class="page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="pst-show_toc_level nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#design-principles">Design Principles</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#package-architecture">Package Architecture</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#reproducible-model-construction">Reproducible Model Construction</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#geospatial-data-and-scalable-i-o">Geospatial Data and Scalable I/O</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#chunking-and-memory-management">Chunking and Memory Management</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#distributed-and-hpc-execution">Distributed and HPC Execution</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#statistical-validation">Statistical Validation</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#bayesian-and-simulation-extensions">Bayesian and Simulation Extensions</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#documentation-and-quality-assurance">Documentation and Quality Assurance</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#reproducibility">Reproducibility</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#summary">Summary</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#principal-references">Principal References</a></li>
+</ul>
+  </nav></div>
 
   <div class="sidebar-secondary-item">
 
