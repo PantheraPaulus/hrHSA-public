@@ -733,7 +733,7 @@ Each posterior draw represents one plausible state of the ecological system. Rep
 
 Bayesian inference does not remove the need for validation. Priors should be examined through prior-predictive simulation, fitted models through posterior-predictive checks, and predictive performance through the temporally blocked and leave-one-individual-out procedures described in the preceding chapter. Weak identifiability, an inappropriate availability distribution or an inadequate ecological model cannot be repaired by increasingly elaborate computation.
 
-The purpose of the Bayesian extension is therefore not complexity for its own sake. It is to bring the inferential model into closer correspondence with the ecological system: locations and environments are observed imperfectly, populations consist of heterogeneous individuals, and selection may change through time. Representing these processes jointly permits uncertainty to remain visible, individual variation to become an object of inference and ecological change to be detected rather than averaged away.
+The purpose of the Bayesian extension is therefore to bring the inferential model into closer correspondence with the ecological system: locations and environments are observed imperfectly, populations consist of heterogeneous individuals, and selection may change through time. Representing these processes jointly permits uncertainty to remain visible, individual variation to become an object of inference and ecological change to be detected rather than averaged away.
 
 ## Principal References
 
