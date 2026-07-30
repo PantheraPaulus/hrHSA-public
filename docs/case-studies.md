@@ -121,13 +121,13 @@ The resulting posterior distributions immediately reveal that the apparent lack 
 
 ## Seasonally-Variant RSF (Lion)
 
-## Challenge
+### Challenge
 
 Large African carnivores frequently exhibit strong associations with river systems. In semi-arid environments, rivers function as linear oases, supporting comparatively high primary productivity and consequently elevated prey densities. Yet the strength of this association is unlikely to remain constant throughout the year. Seasonal rainfall alters vegetation structure, prey distributions, and water availability, while prolonged drought may fundamentally reshape habitat selection.
 
 We therefore ask how lion selection for riverine habitat changes throughout the annual cycle, and whether this seasonal trajectory differs between contrasting environmental conditions.
 
-## Solution
+### Solution
 Using telemetry data from 21 lions, we fitted a Resource Selection Function.
 
 ![Seasonal RSF](figures-for-doc/rsf_surface_lions.png "Seasonal RSF")
