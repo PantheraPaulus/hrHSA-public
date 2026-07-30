@@ -120,7 +120,6 @@ The resulting posterior distributions immediately reveal that the apparent lack 
 
 
 ## Seasonally-Variant RSF (Lion)
-# Seasonally-Variant RSF (Lion)
 
 ## Challenge
 
