@@ -127,6 +127,7 @@ Large African carnivores frequently exhibit strong associations with river syste
 
 We therefore ask how lion selection for riverine habitat changes throughout the annual cycle, and whether this seasonal trajectory differs between contrasting environmental conditions.
 
+## Solution
 Using telemetry data from 21 lions, we fitted a Resource Selection Function.
 
 ![Seasonal RSF](figures-for-doc/rsf_surface_lions.png "Seasonal RSF")
