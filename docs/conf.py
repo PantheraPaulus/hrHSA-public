@@ -22,8 +22,8 @@ sys.path.insert(0, str(SOURCE_DIRECTORY))
 # ---------------------------------------------------------------------------
 
 project = "hrHSA"
-copyright = "Kasko & Kühn, 2026"
-author = "Paul Kasko, Lubov Kabo, and Ralph Kühn"
+copyright = "Kasko & Kühn, 2026 (GNU)"
+author = "Paul Kasko and Ralph Kühn"
 release = "0.1.0"
 
 
