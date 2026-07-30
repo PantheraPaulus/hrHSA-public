@@ -65,7 +65,7 @@
 
 
 \title{hrHSA}
-\date{Jul 29, 2026}
+\date{Jul 30, 2026}
 \release{0.1.0}
 \author{Paul Kasko, Lubov Kabo, and Ralph Kühn}
 \newcommand{\sphinxlogo}{\vbox{}}
@@ -242,10 +242,10 @@ Confirm that the relocation and raster coordinate systems agree:
 \section{3. Define availability}
 \label{\detokenize{getting_started:define-availability}}
 \sphinxAtStartPar
-A resource\sphinxhyphen{}selection analysis compares observed use with environmental conditions that were accessible but not necessarily used. The definition of availability is therefore part of the ecological model rather than merely a computational preprocessing decision.
+A resource\sphinxhyphen{}selection analysis compares observed use with environmental conditions that were accessible but not necessarily used. The definition of availability is therefore part of the model rather than merely a computational preprocessing decision.
 
 \sphinxAtStartPar
-Here, separate availability domains are estimated for each individual using a centroid\sphinxhyphen{}trimmed 95\% minimum convex polygon:
+Here, separate availability domains are estimated for each individual agent using a centroid\sphinxhyphen{}trimmed 95\% minimum convex polygon:
 
 \begin{sphinxVerbatim}[commandchars=\\\{\}]
 \PYG{n}{domains} \PYG{o}{=} \PYG{n}{get\PYGZus{}availability\PYGZus{}domain}\PYG{p}{(}
@@ -1815,8 +1815,8 @@ Validation returns fold\sphinxhyphen{}specific coefficients, predictions, surfac
 Movement modules provide trajectory preparation, step\sphinxhyphen{}length and turning\sphinxhyphen{}angle calculation, and estimation of empirical movement distributions by individual. These components supply the movement information required by subsequent SSF and iSSF workflows.
 
 
-\section{Bayesian and Simulation Extensions}
-\label{\detokenize{implementation:bayesian-and-simulation-extensions}}
+\section{Bayesian Inference and Simulation Validation}
+\label{\detokenize{implementation:bayesian-inference-and-simulation-validation}}
 \sphinxAtStartPar
 The package architecture is intended to support hierarchical Bayesian inference and large stochastic simulation ensembles. Feature construction, environmental sampling and validation are kept independent of the fitting backend so that likelihood\sphinxhyphen{}based estimation may be supplemented by PyMC\sphinxhyphen{} or JAX\sphinxhyphen{}based models without rebuilding the complete geospatial workflow.
 
@@ -1947,6 +1947,39 @@ Wilson, G. et al. (2017). Good enough practices in scientific computing. \sphinx
 
 \section{Static RSF (Pangolin)}
 \label{\detokenize{case-studies:static-rsf-pangolin}}
+
+\subsection{Challenge}
+\label{\detokenize{case-studies:challenge}}
+\sphinxAtStartPar
+Ground pangolins are extremely cryptic animals. Little is know about their species biology, habitat preferences, and life history; what is known stems from studies from small sample sizes (as tracking them requires substantial effort) in confined regional settings, so we do not know whether their results represent the entire variability found within the species across their enormeous range. This question is not of purely academic interest, but central to their continued survival: Due to the high poaching pressure on these animals, they are likely to only survive at reasonable densities (such allowing for gene flow and a back\sphinxhyphen{}up for stochastic events) in reserves and sanctuaries. To identify suitable sites for new protected areas, which are required in the scope of global change, we must assess habitat preferences, and we must do so well:
+\begin{enumerate}
+\sphinxsetlistlabels{\arabic}{enumi}{enumii}{}{)}%
+\item {} 
+\sphinxAtStartPar
+Failing to account for essential habitat requirements means that an entire subpopulation may be lost, of an already treatened animal.
+
+\item {} 
+\sphinxAtStartPar
+Failing to account for individual differences means we may artificially confine the niche space that would be available to the entire species, thereby enforcing arteficial selection which may reduce the adaptive population of the species.
+
+\item {} 
+\sphinxAtStartPar
+Failing to account for uncertainty means we could overinterpret idiosyncratic effects in our reserve or sensor noise (GNSS uncertainty, errors in the derivation of env predictors from RS imagery)
+
+\end{enumerate}
+
+\sphinxAtStartPar
+From extensive field observation, we assume that pangolins rely on edge\sphinxhyphen{}structure (between dense bush and veldt). They might find higher prey abundance and diversity (ants and termity) in this diverse habitat, burrow\sphinxhyphen{}dwelling opportunities and protection (indeed, stressed pangolins are often observed foraging in the open, and will rapidly retreat into the adjacent bush). Thus, completely open areas (recently debushed areas) as well as bush\sphinxhyphen{}encroached dense areas should be excluded from future planing, if our hypothesis is true. Based on the previous discussion of the theory, we formulate the hypothesis:
+
+\sphinxAtStartPar
+H: Pangolins will display a relative presence to edge\sphinxhyphen{}structure.
+
+\sphinxAtStartPar
+We are presented with GNSS data from 26 pangolins with an average of 1022.27 recorded GNSS positions (fixes) (min\sphinxhyphen{}max: 589 to 2008) spanning from July 2024 to April 2026. The tags are fitted with an above\sphinxhyphen{}ground detection algorithm, which we have described elsewhere (Kasko et al., in prep), which results in an average of 5\sphinxhyphen{}6 fixes / day, which corresponds to the 5\sphinxhyphen{}6 hours pangolins spend on average outside their burrow at hourly fix rate.
+
+\sphinxAtStartPar
+The question is how to operationalize the edge\sphinxhyphen{}structure we discussed. In this example, we shall rely on Sentinel\sphinxhyphen{}1 Synthetic Aperature Radar (SAR) imagery, the qualities and technical specifications of which have been described elsewhere in great detail (https://sentiwiki.copernicus.eu/web/sentinel\sphinxhyphen{}1). We detected edges but a sharp change in the ratio between the vertically and horizontally polarized backscatter, and calculated two summary metrics that we suppose and propose have ecological meaning for pangolin: distance to edge and edge density at different grain sizes. Additionally, we included slope, sand\sphinxhyphen{} and clay\sphinxhyphen{}content into this pedagogical model to showcast the shrinking ability of the Bayesian approach.
+
 
 \section{Seasonally\sphinxhyphen{}Variant RSF (Lion)}
 \label{\detokenize{case-studies:seasonally-variant-rsf-lion}}

@@ -107,9 +107,9 @@ assert reloc.crs == env.rio.crs
 
 ## 3. Define availability
 
-A resource-selection analysis compares observed use with environmental conditions that were accessible but not necessarily used. The definition of availability is therefore part of the ecological model rather than merely a computational preprocessing decision.
+A resource-selection analysis compares observed use with environmental conditions that were accessible but not necessarily used. The definition of availability is therefore part of the model rather than merely a computational preprocessing decision.
 
-Here, separate availability domains are estimated for each individual using a centroid-trimmed 95% minimum convex polygon:
+Here, separate availability domains are estimated for each individual agent using a centroid-trimmed 95% minimum convex polygon:
 
 ```python
 domains = get_availability_domain(

@@ -181,7 +181,7 @@ Validation returns fold-specific coefficients, predictions, surfaces, Boyce diag
 
 Movement modules provide trajectory preparation, step-length and turning-angle calculation, and estimation of empirical movement distributions by individual. These components supply the movement information required by subsequent SSF and iSSF workflows.
 
-## Bayesian and Simulation Extensions
+## Bayesian Inference and Simulation Validation
 
 The package architecture is intended to support hierarchical Bayesian inference and large stochastic simulation ensembles. Feature construction, environmental sampling and validation are kept independent of the fitting backend so that likelihood-based estimation may be supplemented by PyMC- or JAX-based models without rebuilding the complete geospatial workflow.
 

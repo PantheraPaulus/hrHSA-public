@@ -1,1 +1,4 @@
 notebooks/lions/data/ALL_LION_DATA.csv
+notebooks/pangolin/*.zarr
+notebooks/pangolin/data/relocations/*.csv
+notebooks/lions/data/*.csv

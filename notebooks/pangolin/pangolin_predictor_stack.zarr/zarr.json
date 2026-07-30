@@ -7,14 +7,14 @@
     "metadata": {
       "band": {
         "shape": [
-          43
+          13
         ],
         "data_type": "string",
         "chunk_grid": {
           "name": "regular",
           "configuration": {
             "chunk_shape": [
-              43
+              13
             ]
           }
         },
@@ -48,18 +48,18 @@
       },
       "env": {
         "shape": [
-          43,
-          216,
-          194
+          13,
+          720,
+          642
         ],
         "data_type": "float32",
         "chunk_grid": {
           "name": "regular",
           "configuration": {
             "chunk_shape": [
-              43,
-              216,
-              194
+              13,
+              720,
+              642
             ]
           }
         },
@@ -99,14 +99,14 @@
       },
       "x": {
         "shape": [
-          194
+          642
         ],
         "data_type": "float64",
         "chunk_grid": {
           "name": "regular",
           "configuration": {
             "chunk_shape": [
-              194
+              642
             ]
           }
         },
@@ -144,14 +144,14 @@
       },
       "y": {
         "shape": [
-          216
+          720
         ],
         "data_type": "float64",
         "chunk_grid": {
           "name": "regular",
           "configuration": {
             "chunk_shape": [
-              216
+              720
             ]
           }
         },

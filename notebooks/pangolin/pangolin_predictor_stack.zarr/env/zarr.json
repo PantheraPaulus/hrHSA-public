@@ -1,17 +1,17 @@
 {
   "shape": [
-    43,
-    216,
-    194
+    13,
+    720,
+    642
   ],
   "data_type": "float32",
   "chunk_grid": {
     "name": "regular",
     "configuration": {
       "chunk_shape": [
-        43,
-        216,
-        194
+        13,
+        720,
+        642
       ]
     }
   },

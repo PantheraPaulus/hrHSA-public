@@ -545,8 +545,8 @@ B n_x n_y d.
 <p>Validation returns fold-specific coefficients, predictions, surfaces, Boyce diagnostics, calibration tables and sample sizes. Retaining these outputs permits individual failures and unstable coefficients to be examined instead of concealing them within a single pooled score.</p>
 <p>Movement modules provide trajectory preparation, step-length and turning-angle calculation, and estimation of empirical movement distributions by individual. These components supply the movement information required by subsequent SSF and iSSF workflows.</p>
 </section>
-<section id="bayesian-and-simulation-extensions">
-<h2>Bayesian and Simulation Extensions<a class="headerlink" href="#bayesian-and-simulation-extensions" title="Link to this heading">#</a></h2>
+<section id="bayesian-inference-and-simulation-validation">
+<h2>Bayesian Inference and Simulation Validation<a class="headerlink" href="#bayesian-inference-and-simulation-validation" title="Link to this heading">#</a></h2>
 <p>The package architecture is intended to support hierarchical Bayesian inference and large stochastic simulation ensembles. Feature construction, environmental sampling and validation are kept independent of the fitting backend so that likelihood-based estimation may be supplemented by PyMC- or JAX-based models without rebuilding the complete geospatial workflow.</p>
 <p>Gradient-based algorithms such as Hamiltonian Monte Carlo and the No-U-Turn Sampler are particularly suitable for the high-dimensional and correlated parameter spaces produced by hierarchical habitat-selection models (Hoffman &amp; Gelman, 2014; Betancourt, 2017). Independent chains can be distributed across processes or nodes, while automatic differentiation and just-in-time compilation may accelerate repeated likelihood evaluation.</p>
 <p>Forward simulations provide a second level of parallelism. Independent trajectories or posterior simulations may be distributed among workers, while the candidate steps within each trajectory can be evaluated through vectorised array operations.</p>
@@ -651,7 +651,7 @@ B n_x n_y d.
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#chunking-and-memory-management">Chunking and Memory Management</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#distributed-and-hpc-execution">Distributed and HPC Execution</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#statistical-validation">Statistical Validation</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#bayesian-and-simulation-extensions">Bayesian and Simulation Extensions</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#bayesian-inference-and-simulation-validation">Bayesian Inference and Simulation Validation</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#documentation-and-quality-assurance">Documentation and Quality Assurance</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#reproducibility">Reproducibility</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#summary">Summary</a></li>
