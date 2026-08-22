@@ -1061,6 +1061,7 @@ $$
 $$
 
 and
+
 $$
 \gamma_{\log L}
 +\delta_{\log L,1}z_1
@@ -1068,6 +1069,7 @@ $$
 $$
 
 then
+
 $$
 \frac{
 1+\gamma_{\log L}(z_1,z_2)
