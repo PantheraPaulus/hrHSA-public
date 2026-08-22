@@ -497,7 +497,7 @@ Such contrasts remain directly interpretable. The long-term consequences of the 
 Predicted utilisation distributions, residence times, crossing probabilities and home-range geometry should consequently be obtained through simulation of the complete transition process. At each step, candidate movements are drawn from the fitted movement kernel, weighted according to habitat, and sampled to produce the next location. Repetition generates trajectories whose emergent spatial patterns can be compared with held-out observations.
 
 RSFs, SSFs and iSSFs therefore represent a progression in the treatment of availability. An RSF relates use to a broader and approximately static available distribution. An SSF conditions availability upon the animal's previous location. An iSSF jointly estimates the movement process generating those local alternatives and the habitat-selection process distinguishing among them. The appropriate framework depends upon the temporal scale of the data and the inferential question being addressed.
-## Towards Bayesian Inference
+# Towards Bayesian Inference
 
 The preceding models commonly proceed as though recorded locations were exact, environmental covariates were known without error, individuals differed only through random sampling, and habitat-selection relationships remained constant through time. Each assumption is convenient; none is generally true. A Bayesian analysis is not the only means of relaxing them, but it provides a coherent framework in which uncertain observations, latent ecological processes, individual heterogeneity and temporal change may be represented jointly and propagated into the final inference.
 
@@ -733,7 +733,7 @@ Each posterior draw represents one plausible state of the ecological system. Rep
 
 Bayesian inference does not remove the need for validation. Priors should be examined through prior-predictive simulation, fitted models through posterior-predictive checks, and predictive performance through the temporally blocked and leave-one-individual-out procedures described in the preceding chapter. Weak identifiability, an inappropriate availability distribution or an inadequate ecological model cannot be repaired by increasingly elaborate computation.
 
-The purpose of the Bayesian extension is therefore to bring the inferential model into closer correspondence with the ecological system: locations and environments are observed imperfectly, populations consist of heterogeneous individuals, and selection may change through time. Representing these processes jointly permits uncertainty to remain visible, individual variation to become an object of inference and ecological change to be detected rather than averaged away.
+The purpose of the Bayesian extension is therefore not complexity for its own sake. It is to bring the inferential model into closer correspondence with the ecological system: locations and environments are observed imperfectly, populations consist of heterogeneous individuals, and selection may change through time. Representing these processes jointly permits uncertainty to remain visible, individual variation to become an object of inference and ecological change to be detected rather than averaged away.
 
 ## Principal References
 

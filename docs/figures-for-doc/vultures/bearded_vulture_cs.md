@@ -1,224 +1,19 @@
-# Case Studies
+<!--
+Place this file in notebooks/new_notebooks/01_vultures/CASE-STUDY/
+so the relative figure paths below resolve to the existing PNG files.
+-->
 
-## Static RSF (Pangolin)
+# Detecting Vulture Highways from Space: an integrated step-selection case study with bearded vultures
 
-### Challenge
-
-Ground pangolins are among the most cryptic large mammals on Earth. As a consequence, surprisingly little is known about their habitat requirements, life history, or behavioural ecology. The few available telemetry studies are necessarily based on small sample sizes and geographically restricted populations, making it unclear whether their conclusions can be generalized across the species' vast distribution.
-
-This uncertainty is of direct conservation relevance. Throughout much of their range, ground pangolins are threatened by intense poaching pressure and are likely to persist at viable densities only within well-managed reserves and sanctuaries. Identifying suitable areas for future protection therefore requires an accurate understanding of habitat selection. Failing to identify essential habitat features may render newly established reserves unsuitable; failing to account for individual variation may underestimate the ecological niche available to the species as a whole; and failing to quantify uncertainty risks overinterpreting stochastic patterns arising from telemetry error or remotely sensed environmental predictors.
-
-Based on extensive field observations, we hypothesize that ground pangolins preferentially select habitat edges between dense bush and open grassland. Such ecotones may provide a favourable combination of prey abundance (ants and termites), suitable burrow locations, and immediate refuge from predators or disturbance. Indeed, disturbed pangolins are frequently observed retreating from open foraging areas into adjacent bush. If this hypothesis is correct, both heavily bush-encroached areas and recently cleared landscapes should represent comparatively poor habitat.
-
-Testing this hypothesis requires translating the qualitative concept of an edge into quantitative environmental predictors suitable for a Resource Selection Function.
-
-We analyse telemetry data from 26 ground pangolins collected between July 2024 and April 2026, comprising an average of 1,022 relocations per individual (range 589–2,008). The collars employ an above-ground detection algorithm (Kasko et al., in prep.), recording locations only while the animal is active outside its burrow. This results in approximately 5–6 relocations per day, corresponding closely to the average nightly activity period.
-
-To quantify vegetation structure, we derived habitat metrics from Sentinel-1 Synthetic Aperture Radar (SAR) imagery. Edges were detected as abrupt spatial changes in the ratio between vertically and horizontally polarized backscatter. From these edge maps we calculated two predictors that we hypothesize to be ecologically meaningful for pangolins: distance to the nearest edge and edge density at multiple spatial scales. To illustrate Bayesian regularization and variable selection, we additionally included NDVI, terrain slope, and soil sand and clay content as candidate predictors.
-
-![Pangolin Predictor Stack](figures-for-doc/pangolin-predictor-stack.png "Pangolin Predictor Stack")
-
-### Frequentialist approach
-
-We begin with a conventional Resource Selection Function fitted by maximum likelihood. As described in the previous chapters, this requires contrasting observed relocations with randomly sampled available locations drawn from each individual's availability domain.
-
-First, we load the telemetry data
-
-```python
-from hsa.movement.geometry import prepare_trajectory_data
-df = pd.read_csv("data/relocations/pango-large-subset.csv")
-reloc = prepare_trajectory_data(df, geometry_col="geometry", source_crs = "EPSG:32733", target_crs = "EPSG:32733")
-```
-
-and the environmental predictor stack:
-```python
-from hsa.compute import open_raster_stack_zarr
-from hsa.compute import suggest_xy_chunks
-import xarray as xr
-import rioxarray 
-
-env = open_raster_stack_zarr("pangolin_predictor_stack.zarr")
-env = env.chunk(suggest_xy_chunks(env, target_chunk_mb=256))
-env = env.rio.write_crs("EPSG:32733")
-```
-
-Pseudoabsence locations are generated from the individual-specific availability domains before extracting environmental conditions for both used and available points:
-
-```python
-from hsa.sampling import get_availability_domain, sample_available_points, sample_raster_stack
-domains = get_availability_domain(reloc, id_col="Individual_ID")
-sampling = sample_available_points(domains, used = reloc, n_per_used = 50, id_col = "Individual_ID")
-sampled = sample_raster_stack(sampling, env, id_cols="Individual_ID")
-```
-
-Subsequently, we can iteratively fit models and check coefficients as well as cv-performance:
-
-```python
-from hsa.features import FeatureSpec
-from hsa.rsf import fit_rsf, predict_rsf_surface
-
-specs = FeatureSpec(linear = ["ndvi_30m"])
-model, scaler, spec, meta = fit_rsf(sampled, specs)
-rsf = predict_rsf_surface(env, model, scaler, spec, meta)
-rsf["exp"] = np.exp(rsf)
-```
-
-During model construction we observe that edge-related variables consistently improve predictive performance, whereas several additional environmental predictors contribute comparatively little:
-
-![Progressive Construction](figures-for-doc/progressive_construction.png "Progessive Model Construction")
-
-Cross-validation suggests that the model performs well at the population level. However, examining validation statistics separately for each individual reveals an intriguing pattern.
-![Boyce Curves](figures-for-doc/boyce_curves.png "Confusing Boyce Curves")
-
-Although the average Boyce Index indicates satisfactory predictive performance, several individuals exhibit substantial deviations from the population trend. Some are predicted remarkably well, whereas others display weak or even contradictory selection patterns. This observation raises an important biological question: are these merely noisy individuals, or do different pangolins genuinely respond differently to their environment?
-
-A classical RSF cannot distinguish between these possibilities because it assumes a single regression coefficient for every individual. We therefore turn to a hierarchical Bayesian formulation.
-### Bayesian approach
-
-Hierarchical Bayesian models provide a natural extension of the classical Resource Selection Function by explicitly recognising that individuals need not respond identically to the same environmental conditions. Rather than estimating a single coefficient for each predictor, we estimate a population-level distribution from which individual-specific coefficients are drawn.
-
-Mathematically, the linear predictor becomes
-
-$$
-\eta_i
-=
-\alpha_{j[i]}
-+
-\sum_{k=1}^{K}
-\beta_{k,j[i]} x_{ik},
-$$
-
-where observation $i$ belongs to individual $j$.
-
-Each individual regression coefficient is assumed to arise from a population-level distribution,
-
-$$
-\beta_{k,j}
-\sim
-\mathcal{N}\!\left(\mu_k,\sigma_k\right),
-$$
-
-where $\mu_k$ represents the average effect of predictor $k$ across the population, and $\sigma_k$ quantifies the extent of individual variation.
-
-Similarly, the individual intercepts are modelled as
-
-$$
-\alpha_j
-\sim
-\mathcal{N}\!\left(\mu_\alpha,\sigma_\alpha\right).
-$$
-
-This formulation allows information to be shared across individuals through partial pooling, while still permitting genuine behavioural differences to emerge.
-
-To reduce overfitting, we additionally employ a hierarchical regularized horseshoe prior, which automatically shrinks unsupported predictors towards zero while allowing important environmental variables to retain substantial effect sizes.
-
-Fitting the model requires only replacing the estimation routine.
-
-The resulting posterior distributions immediately reveal that the apparent lack of fit in the classical model was not simply statistical noise. Instead, individuals differ markedly in the strength—and occasionally even the direction—of habitat selection.
-
-![Posterior NDVI](figures-for-doc/posterior_individual_slopes_ndvi.png "Posterior Slopes")
-
-
-## Seasonally-Variant RSF (Lion)
-
-### Challenge
-
-Large African carnivores frequently exhibit strong associations with river systems. In semi-arid environments, rivers function as linear oases, supporting comparatively high primary productivity and consequently elevated prey densities. Yet the strength of this association is unlikely to remain constant throughout the year. Seasonal rainfall alters vegetation structure, prey distributions, and water availability, while prolonged drought may fundamentally reshape habitat selection.
-
-We therefore ask how lion selection for riverine habitat changes throughout the annual cycle, and whether this seasonal trajectory differs between contrasting environmental conditions.
-
-### Solution
-Using telemetry data from 21 lions, we fitted a Resource Selection Function.
-
-![Seasonal RSF](figures-for-doc/rsf_surface_lions.png "Seasonal RSF")
-
-To quantify these dynamics formally, we model the probability that relocation $j$ is used as
-
-$$
-y_j
-\sim
-\mathrm{Binomial}(n_j,p_j),
-$$
-
-with
-
-$$
-\mathrm{logit}(p_j)
-=
-\alpha_i
-+
-\beta_{i,s[j]}x^{\mathrm{river}}_j
-+
-\boldsymbol{\theta}^{\top}\mathbf{x}_j,
-$$
-
-where $x^{\mathrm{river}}_j$ denotes the standardized river predictor, $\mathbf{x}_j$ contains the remaining environmental covariates, observation $j$ belongs to individual $i$, and occurs during season $s[j]$.
-
-Rather than estimating an independent river-selection coefficient for every season, we decompose the effect hierarchically as
-
-$$
-\beta_{i,s}
-=
-\mu_\beta
-+
-\gamma_{g[i]}
-+
-\delta_s
-+
-\kappa_{g[i],s}
-+
-b_i,
-$$
-
-where
-
-- $\mu_\beta$ is the overall population mean,
-- $\gamma_g$ is the effect of group $g$,
-- $\delta_s$ represents the shared seasonal trajectory,
-- $\kappa_{g,s}$ captures group-specific seasonal deviations, and
-- $b_i \sim \mathcal{N}(0,\sigma_{\mathrm{individual}})$ represents persistent individual variation.
-
-Consequently, the expected seasonal trajectory for each group becomes
-
-$$
-\beta_{g,s}
-=
-\mu_\beta
-+
-\gamma_g
-+
-\delta_s
-+
-\kappa_{g,s},
-$$
-
-while each individual follows
-
-$$
-\beta_{i,s}
-=
-\beta_{g[i],s}
-+
-b_i.
-$$
-
-The posterior trajectories clearly demonstrate that river selection is not static, but fluctuates predictably throughout the annual cycle. Moreover, the two ecological groups exhibit distinct seasonal responses, illustrating how hierarchical Bayesian models can simultaneously estimate population-level temporal trends while retaining persistent individual differences.
-
-![Bayesian posterior lions](figures-for-doc/river_proximity_coefficients.png "Coefficients")
-
-
-## Dynamic SSF (Vultures)
-
-### 1. Question
+## 1. Question
 
 Bearded vultures _(Gypaetus barbatus)_ move through a landscape in which the energetic cost of flight changes from hour to hour. The relevant landscape thus cannot be fully described in environmental space alone, but must be integrated through time to reveal an energy landscape dynamically generated by interactions between atmosphere and terrain. Soaring allows large birds to replace metabolically costly flapping with energy extracted from rising air, and vultures can sustain soaring–gliding flight at energetic costs close to resting levels under favourable conditions (Duriez et al., 2014). The central question of this case study is therefore:
 
 > **How do bearded vultures select locations and modify their movement in response to dynamically varying thermal and orographic uplift conditions?**
 
-
 Two mechanisms dominate inland soaring. Thermal soaring exploits buoyant ascent generated by surface heating; birds typically climb by circling within rising air and then convert altitude into horizontal displacement during glides. Slope soaring exploits mechanically generated uplift where horizontal wind is forced upward by topography. The relative importance of these modes changes with weather, topography and the spatial scale at which movement is observed (Bohrer et al., 2012; Santos et al., 2017; Harel et al., 2016; Scacco et al., 2019).
 
-![Soaring Ecology of Bearded vultures](<figures-for-doc//vultures/Infografik zum Segelflug der Bartgeier.png>)
+![Soaring Ecology of Bearded vultures](<Infografik zum Segelflug der Bartgeier.png>)
 The statistical challenge is that the same conditions that affect *where* a bird moves can also affect *how* it moves. A step-selection analysis therefore becomes most informative when the habitat-selection and movement processes are estimated jointly.
 
 ---
@@ -267,7 +62,7 @@ $$
 
 with units of $m s^{-1}$ when $u$ and $v$ are in $m s^{-1}$. Positive values indicate wind directed upslope and therefore potential terrain-forced ascent; negative values indicate downslope flow. This is closely related to the terrain–wind formulations of Brandes & Ombalski (2004) and Bohrer et al. (2012), but is expressed directly as horizontal flow across the local terrain gradient.
 
-![Orographic wind potential](figures-for-doc//vultures/orographic-upwind_conditions.png)
+![Orographic wind potential](orographic-upwind_conditions.png)
 
 *Orographic uplift potential across five hourly wind fields. The alternating positive and negative patches arise because a common wind field encounters opposing slope orientations. The spatial pattern is consequently more terrain-structured and less strongly diurnal than the thermal field.*
 
@@ -289,7 +84,7 @@ Positive $H$ means that sensible heat is transferred from the surface to the atm
 
 
 
-![Thermal potential](figures-for-doc//vultures/thermal_conditions.png)
+![Thermal potential](thermal_conditions.png)
 
 *Hourly sensible heat flux shows a pronounced diurnal development. Unlike the ridge-scale structure of the orographic proxy, thermal forcing is spatially smoother because its atmospheric component is inherited from the coarser ERA5-Land field.*
 
@@ -305,7 +100,7 @@ $$
 
 The difficulty is the definition of availability. An SSF makes availability local and conditional on movement: each observed step is compared with alternative steps beginning at the same location (Fortin et al., 2005; Thurfjell et al., 2014).
 
-![Step Selection](figures-for-doc//vultures/step-selection-explanation.png)
+![Step Selection](step-selection-explanation.png)
 
 For stratum $s$, let $j=0,\ldots,J-1$ index the observed endpoint and its alternatives. In this case study we draw $20$ available alternatives, so each retained stratum contains $J=21$ choices. The conditional-choice probability is
 
@@ -786,7 +581,7 @@ fit_corrected = issf.fit(
 
 The correction markedly strengthens the elevation, slope, ruggedness and heat coefficients. Mathematically this means that the proposal distribution itself made some high-value terrain relatively easy to sample. Once each candidate is reweighted by $1/q$, stronger selection is required to explain why the observed endpoints occur there.
 
-![Proposal correction](figures-for-doc//vultures/proposal_correction.png)
+![Proposal correction](proposal_correction.png)
 
 *The proposal correction is an importance-sampling correction, not an additional ecological covariate. Its purpose is to separate the choice process from the non-uniform mechanism used to generate alternatives.*
 
@@ -857,9 +652,9 @@ $$
 
 The negative turning coefficient means that the fitted hourly net-displacement kernel places relatively more mass at large turning angles than at $0^\circ$. This does not imply repeated literal reversals in flight: a vulture may circle in uplift and then leave in a new direction while the GPS data record only the net hourly displacement.
 
-![Baseline step distribution](figures-for-doc//vultures/baseline_step_distribution.png)
+![Baseline step distribution](baseline_step_distribution.png)
 
-![Baseline angle distribution](figures-for-doc//vultures/baseline_angle_distribution.png)
+![Baseline angle distribution](baseline_angle_distribution.png)
 
 After movement terms enter, the endpoint coefficients become smaller than in the corrected endpoint-only model (for example elevation decreases from 1.721 to 0.936 and slope from 1.243 to 0.758). This is the central motivation for iSSF: part of what an endpoint-only model attributes to habitat is explained by the geometry of movement itself.
 
@@ -979,7 +774,7 @@ fit_full.plot_movement_response(
     "vrm_2070m_start",
 )
 ```
-![VRM movement response](figures-for-doc//vultures/vrm_2070m_movement_response.png)
+![VRM movement response](vrm_2070m_movement_response.png)
 
 Increasing terrain ruggedness at the beginning of a step is associated with a pronounced reduction in expected displacement. Rather than simply indicating that rugged terrain impedes movement, this response may reflect a change in behavioural state. For bearded vultures, rugged mountain terrain contains cliffs, ridges, and other features associated with favourable soaring and foraging habitat. Shorter displacement under high VRM may therefore indicate localized movement within favourable habitat, whereas movement through less rugged terrain is characterized by longer, more transitory steps. In this interpretation, ruggedness modulates not only where vultures occur, but also how intensively they move through the landscape.
 
@@ -988,7 +783,7 @@ fit_full.plot_movement_response(
     "heat_start",
 )
 ```
-![Heat movement response](figures-for-doc//vultures/heat_movement_response.png)
+![Heat movement response](heat_movement_response.png)
 Thermal conditions show the opposite response. Increasing thermal support strongly increases expected displacement, consistent with the energetic mechanism of thermal soaring: rising air allows vultures to gain altitude with little expenditure of flapping flight and subsequently convert this altitude into long glides. Strong thermal conditions therefore expand the distance that can be covered within an hourly movement step. The model consequently links atmospheric energy availability directly to landscape permeability: under strong thermal uplift, distant parts of the landscape become energetically more accessible.
 
 For turning,
@@ -1013,7 +808,7 @@ fit_full.plot_turning_angle_distribution(
     levels=(-1, 0, 1),
 )
 ```
-![alt text](figures-for-doc//vultures/turning-angle_uplift.png)
+![alt text](turning-angle_uplift.png)
 
 Thus $\delta_\theta>0$ means that increasing the start condition shifts the kernel toward greater directional persistence. In the exploratory orographic example, stronger uplift at departure makes $\kappa$ less negative: the hourly path remains broad, but the relative tendency toward straight continuation increases. Ecologically, this response differs from the effect of thermal uplift. Whereas thermals primarily facilitate long-distance displacement, orographic uplift is spatially constrained by topography: horizontal winds are deflected upward along slopes and ridgelines. Increased directional persistence under stronger orographic support is therefore consistent with ridge-following flight, in which vultures exploit a relatively linear corridor of rising air. Orographic conditions may thus influence the geometry of movement—promoting sustained directional travel along terrain features—even when their effect on absolute displacement is comparatively small.
 
@@ -1047,7 +842,7 @@ fit_full.plot_movement_response(
     moderator_levels=(-1, 0, 1),
 )
 ```
-![Interaction between VRM and heat](figures-for-doc//vultures/interaction-vrm-heat.png)
+![Interaction between VRM and heat](interaction-vrm-heat.png)
 
 The resulting curves reveal a particularly intuitive ecological pattern. Stronger thermal conditions increase expected displacement across all levels of terrain ruggedness, consistent with thermal soaring increasing the distance that can be travelled efficiently within an hourly step. Yet the magnitude of this response depends strongly on the landscape context. In relatively smooth terrain ((-1) SD VRM), strong thermal conditions imply very long displacements, whereas the same increase in thermal support produces a much smaller realized displacement in highly rugged terrain ((+1) SD VRM).
 
@@ -1164,7 +959,7 @@ fit_bayes.plot_forest(
 )
 ```
 
-![Individual movement responses](figures-for-doc//vultures/individual_vrm_step_response.png)
+![Individual movement responses](individual_vrm_step_response.png)
 
 *Individual curves show the same ecological question on a common scale: how much does expected net displacement change across the environmental gradient? The Bayesian hierarchy distinguishes genuine between-individual response variation from noise caused by unequal sample sizes.*
 
@@ -1182,7 +977,7 @@ for individual in reloc["individual-local-identifier"].unique():
         ax=ax,
     )
 ```
-![Individual responses to thermal uplift](figures-for-doc//vultures/individual_heat_movement_response.png)
+![alt text](individual_heat_movement_response.png)
 
 Transforming posterior draws into movement space allows the ecological question to be stated directly: how far is this individual expected to move under a given environmental condition? The same approach can be used to compare complete response curves among individuals rather than comparing isolated regression coefficients.
 
