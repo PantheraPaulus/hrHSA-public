@@ -11,17 +11,5 @@ Developed primarily for wildlife telemetry and spatial ecology, **hrHSA** addres
 getting_started
 theory
 implementation
-hpc-performance
-workstation-benchmark
-inference-performance
-coolmuc4-tuning
-coolmuc4-benchmark
-rsf_objects
-bayesian_rsf
-ssf
-issf
-ssf_fast_engine
-ssf_dynamic_conditions
 case-studies
-api
 ```
