@@ -1,0 +1,974 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="./" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Integrated step-selection workflows &#8212; hrHSA</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="_static/styles/theme.css?digest=90905a2f556bf617f1a9" rel="stylesheet" />
+<link href="_static/styles/pydata-sphinx-theme.css?digest=90905a2f556bf617f1a9" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=8f2a1f02" />
+  
+  <!-- So that users can add custom icons -->
+  <script defer src="_static/scripts/fontawesome.js?digest=90905a2f556bf617f1a9"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="_static/scripts/bootstrap.js?digest=90905a2f556bf617f1a9" />
+<link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=90905a2f556bf617f1a9" />
+
+    <script src="_static/documentation_options.js?v=38b66d78"></script>
+    <script src="_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'issf';</script>
+    <script>DOCUMENTATION_OPTIONS.search_as_you_type = false;</script>
+    <link rel="canonical" href="/issf.html" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Fast frequentist SSF engine" href="ssf_fast_engine.html" />
+    <link rel="prev" title="Step-selection workflows" href="ssf.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+  
+    
+    <script src="_static/searchtools.js"></script>
+    <script src="_static/language_data.js"></script>
+    <script src="searchindex.js"></script>
+  
+  </head>
+  <body data-default-mode="">
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+  
+  
+  
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header id="pst-header" class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">hrHSA</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="getting_started.html">
+    Getting started
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="theory.html">
+    Theory
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="implementation.html">
+    Implementation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="rsf_objects.html">
+    Object-oriented RSF workflows
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="bayesian_rsf.html">
+    Hierarchical Bayesian RSF workflow
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button"
+                data-bs-toggle="dropdown" aria-expanded="false"
+                aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="ssf.html">
+    Step-selection workflows
+  </a>
+</li>
+
+
+<li class=" current active">
+  <a class="nav-link dropdown-item nav-internal" href="#">
+    Integrated step-selection workflows
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="ssf_fast_engine.html">
+    Fast frequentist SSF engine
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="ssf_dynamic_conditions.html">
+    Dynamic environmental condition plots
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="case-studies.html">
+    Case Studies
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="api.html">
+    API reference
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<div class="theme-switch-container dropdown pst-js-only" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Color mode">
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button dropdown-toggle" aria-label="Color mode" data-bs-toggle="dropdown">
+    <i class="theme-switch fa-solid fa-sun fa-lg fa-fw" data-mode="light" title="Light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg fa-fw" data-mode="dark" title="Dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg fa-fw" data-mode="auto" title="System Settings"></i>
+  </button>
+  <ul class="dropdown-menu dropdown-menu-end">
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg fa-fw me-1"></i>System Settings</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="light"><i class="fa-solid fa-sun fa-lg fa-fw me-1"></i>Light</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="dark"><i class="fa-solid fa-moon fa-lg fa-fw me-1"></i>Dark</button></li>
+  </ul>
+</div></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/YOUR-GITHUB-NAME/YOUR-REPOSITORY" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i><span class="visually-hidden">GitHub</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar hide-on-wide">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="getting_started.html">
+    Getting started
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="theory.html">
+    Theory
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="implementation.html">
+    Implementation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="rsf_objects.html">
+    Object-oriented RSF workflows
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="bayesian_rsf.html">
+    Hierarchical Bayesian RSF workflow
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="ssf.html">
+    Step-selection workflows
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="#">
+    Integrated step-selection workflows
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="ssf_fast_engine.html">
+    Fast frequentist SSF engine
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="ssf_dynamic_conditions.html">
+    Dynamic environmental condition plots
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="case-studies.html">
+    Case Studies
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="api.html">
+    API reference
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<div class="theme-switch-container dropdown pst-js-only" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Color mode">
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button dropdown-toggle" aria-label="Color mode" data-bs-toggle="dropdown">
+    <i class="theme-switch fa-solid fa-sun fa-lg fa-fw" data-mode="light" title="Light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg fa-fw" data-mode="dark" title="Dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg fa-fw" data-mode="auto" title="System Settings"></i>
+  </button>
+  <ul class="dropdown-menu dropdown-menu-end">
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg fa-fw me-1"></i>System Settings</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="light"><i class="fa-solid fa-sun fa-lg fa-fw me-1"></i>Light</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="dark"><i class="fa-solid fa-moon fa-lg fa-fw me-1"></i>Dark</button></li>
+  </ul>
+</div></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/YOUR-GITHUB-NAME/YOUR-REPOSITORY" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i><span class="visually-hidden">GitHub</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">Integrated step-selection workflows</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section class="tex2jax_ignore mathjax_ignore" id="integrated-step-selection-workflows">
+<h1>Integrated step-selection workflows<a class="headerlink" href="#integrated-step-selection-workflows" title="Link to this heading">#</a></h1>
+<p><code class="docutils literal notranslate"><span class="pre">hsa.ssf</span></code> exposes integrated step-selection functions (iSSFs) through a stateful workflow that separates four concerns:</p>
+<ol class="arabic simple">
+<li><p>create an analysis from telemetry;</p></li>
+<li><p>generate movement-informed choice sets;</p></li>
+<li><p>annotate static and dynamic environmental conditions;</p></li>
+<li><p>declare the ecological model and fit it.</p></li>
+</ol>
+<p>The public API deliberately does <strong>not</strong> require an environmental raster or a predictor list when the object is created. Environmental fields are passed only when they are sampled, and the model can be changed repeatedly without regenerating availability or resampling covariates.</p>
+<p>For stratum <code class="docutils literal notranslate"><span class="pre">s</span></code> and candidate <code class="docutils literal notranslate"><span class="pre">j</span></code>, the proposal-corrected working utility is</p>
+<p>[
+\eta_{sj}=\mathbf{x}<em>{sj}^{T}\boldsymbol\beta-\log q</em>{sj},
+]</p>
+<p>where <code class="docutils literal notranslate"><span class="pre">q</span></code> is the candidate-generation density stored as <code class="docutils literal notranslate"><span class="pre">proposal_logpdf</span></code>. The fixed offset</p>
+<p>[
+o_{sj}=-\log q_{sj}
+]</p>
+<p>is an importance-sampling correction rather than an estimated ecological effect. It is centered within each stratum by default because adding a common constant to all alternatives leaves the conditional softmax likelihood unchanged.</p>
+<p>The default movement basis is</p>
+<p>[
+L,\qquad \log L,\qquad \cos\theta,
+]</p>
+<p>with <code class="docutils literal notranslate"><span class="pre">L</span></code> represented as <code class="docutils literal notranslate"><span class="pre">step_length_km</span></code>. Movement terms remain on their natural scale. When the fitted coefficients imply a proper Gamma-like kernel,</p>
+<p>[
+k=1+\gamma_{\log L},
+\qquad
+\lambda=-\gamma_L,
+\qquad
+E[L]=k/\lambda.
+]</p>
+<section id="create-the-analysis">
+<h2>1. Create the analysis<a class="headerlink" href="#create-the-analysis" title="Link to this heading">#</a></h2>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">hsa.ssf</span><span class="w"> </span><span class="kn">import</span> <span class="n">FrequentistISSF</span>
+
+<span class="n">issf</span> <span class="o">=</span> <span class="n">FrequentistISSF</span><span class="p">(</span>
+    <span class="n">reloc</span><span class="p">,</span>
+    <span class="n">id_col</span><span class="o">=</span><span class="s2">&quot;individual-local-identifier&quot;</span><span class="p">,</span>
+    <span class="n">timestamp_col</span><span class="o">=</span><span class="s2">&quot;Timestamp&quot;</span><span class="p">,</span>
+    <span class="n">expected_interval_min</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span>
+    <span class="n">tolerance_min</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>No raster and no model specification are required at this stage.</p>
+</section>
+<section id="generate-movement-informed-availability">
+<h2>2. Generate movement-informed availability<a class="headerlink" href="#generate-movement-informed-availability" title="Link to this heading">#</a></h2>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">issf</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span>
+    <span class="n">n_available</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span>
+    <span class="n">seed</span><span class="o">=</span><span class="mi">42</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>If candidate endpoints must remain inside a static environmental domain, pass that raster only for choice-set generation:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">issf</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span>
+    <span class="n">n_available</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span>
+    <span class="n">seed</span><span class="o">=</span><span class="mi">42</span><span class="p">,</span>
+    <span class="n">domain</span><span class="o">=</span><span class="n">terrain</span><span class="p">,</span>
+    <span class="n">observed_outside</span><span class="o">=</span><span class="s2">&quot;exclude&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>The domain is used for candidate-wise rejection sampling and is not retained as analysis state.</p>
+<p>The older <code class="docutils literal notranslate"><span class="pre">prepare_choice_sets()</span></code> method remains available as a low-level compatibility API.</p>
+</section>
+<section id="annotate-static-covariates">
+<h2>3. Annotate static covariates<a class="headerlink" href="#annotate-static-covariates" title="Link to this heading">#</a></h2>
+<p>Endpoint and start conditions can be sampled in one call:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">issf</span><span class="o">.</span><span class="n">annotate_static</span><span class="p">(</span>
+    <span class="n">terrain</span><span class="p">,</span>
+    <span class="n">endpoint</span><span class="o">=</span><span class="p">[</span>
+        <span class="s2">&quot;elevation&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;slope&quot;</span><span class="p">,</span>
+    <span class="p">],</span>
+    <span class="n">start</span><span class="o">=</span><span class="p">{</span>
+        <span class="s2">&quot;vrm_2070m&quot;</span><span class="p">:</span> <span class="s2">&quot;vrm_start&quot;</span><span class="p">,</span>
+    <span class="p">},</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">endpoint=</span></code> samples every candidate endpoint. <code class="docutils literal notranslate"><span class="pre">start=</span></code> samples each unique stratum origin once and merges the result back to all alternatives in that stratum.</p>
+<p>When <code class="docutils literal notranslate"><span class="pre">start=</span></code> is supplied as a sequence rather than a mapping, <code class="docutils literal notranslate"><span class="pre">_start</span></code> is appended automatically:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">issf</span><span class="o">.</span><span class="n">annotate_static</span><span class="p">(</span>
+    <span class="n">terrain</span><span class="p">,</span>
+    <span class="n">start</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;elevation&quot;</span><span class="p">,</span> <span class="s2">&quot;vrm_2070m&quot;</span><span class="p">],</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>produces <code class="docutils literal notranslate"><span class="pre">elevation_start</span></code> and <code class="docutils literal notranslate"><span class="pre">vrm_2070m_start</span></code>.</p>
+</section>
+<section id="annotate-dynamic-covariates">
+<h2>4. Annotate dynamic covariates<a class="headerlink" href="#annotate-dynamic-covariates" title="Link to this heading">#</a></h2>
+<p>The same pattern applies to time-varying fields:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">issf</span><span class="o">.</span><span class="n">annotate_dynamic</span><span class="p">(</span>
+    <span class="n">met</span><span class="p">,</span>
+    <span class="n">endpoint</span><span class="o">=</span><span class="p">{</span>
+        <span class="s2">&quot;sensible_heat_flux_upward&quot;</span><span class="p">:</span> <span class="s2">&quot;heat&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;surface_air_temperature_excess&quot;</span><span class="p">:</span> <span class="s2">&quot;temp_excess&quot;</span><span class="p">,</span>
+    <span class="p">},</span>
+    <span class="n">start</span><span class="o">=</span><span class="p">{</span>
+        <span class="s2">&quot;sensible_heat_flux_upward&quot;</span><span class="p">:</span> <span class="s2">&quot;heat_start&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;surface_air_temperature_excess&quot;</span><span class="p">:</span> <span class="s2">&quot;temp_excess_start&quot;</span><span class="p">,</span>
+    <span class="p">},</span>
+    <span class="n">method</span><span class="o">=</span><span class="s2">&quot;linear&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>The defaults encode the canonical iSSF timing semantics:</p>
+<ul class="simple">
+<li><p>endpoint covariates are sampled at <code class="docutils literal notranslate"><span class="pre">end_time</span></code>;</p></li>
+<li><p>start covariates are sampled at <code class="docutils literal notranslate"><span class="pre">start_time</span></code>.</p></li>
+</ul>
+<p>These can be overridden with <code class="docutils literal notranslate"><span class="pre">endpoint_time_col=</span></code> and <code class="docutils literal notranslate"><span class="pre">start_time_col=</span></code> when necessary.</p>
+</section>
+<section id="vector-fields-and-wind-support">
+<h2>5. Vector fields and wind support<a class="headerlink" href="#vector-fields-and-wind-support" title="Link to this heading">#</a></h2>
+<p>Vector annotation is exposed as one convenience operation:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">issf</span><span class="o">.</span><span class="n">annotate_vector</span><span class="p">(</span>
+    <span class="n">met</span><span class="p">,</span>
+    <span class="n">u</span><span class="o">=</span><span class="s2">&quot;wind_u_10m&quot;</span><span class="p">,</span>
+    <span class="n">v</span><span class="o">=</span><span class="s2">&quot;wind_v_10m&quot;</span><span class="p">,</span>
+    <span class="n">prefix</span><span class="o">=</span><span class="s2">&quot;wind&quot;</span><span class="p">,</span>
+    <span class="n">at</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;endpoint&quot;</span><span class="p">,</span> <span class="s2">&quot;start&quot;</span><span class="p">),</span>
+    <span class="n">support</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">method</span><span class="o">=</span><span class="s2">&quot;linear&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>This samples the vector components and derives vector magnitude plus geodesic support/alignment. With <code class="docutils literal notranslate"><span class="pre">prefix=&quot;wind&quot;</span></code>, the important model-ready outputs include:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>wind_support
+wind_start_support
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">wind_support</span></code> uses the wind vector at each candidate endpoint. <code class="docutils literal notranslate"><span class="pre">wind_start_support</span></code> uses the single wind vector at the shared step start but projects it onto each candidate bearing, so it varies among alternatives and is therefore a candidate-level directional predictor.</p>
+<p>Positive support is tailwind support; negative support is headwind support.</p>
+</section>
+<section id="declare-the-ecological-model">
+<h2>6. Declare the ecological model<a class="headerlink" href="#declare-the-ecological-model" title="Link to this heading">#</a></h2>
+<p>The preferred model API is <code class="docutils literal notranslate"><span class="pre">set_model()</span></code>.</p>
+<p>A plain endpoint-selection model is:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">issf</span><span class="o">.</span><span class="n">set_model</span><span class="p">(</span>
+    <span class="n">selection</span><span class="o">=</span><span class="p">[</span>
+        <span class="s2">&quot;elevation&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;slope&quot;</span><span class="p">,</span>
+    <span class="p">],</span>
+    <span class="n">movement</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>With the proposal correction retained, this is an endpoint-only proposal-corrected choice model. To deliberately fit an uncorrected conventional conditional-choice model:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">issf</span><span class="o">.</span><span class="n">set_model</span><span class="p">(</span>
+    <span class="n">selection</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;elevation&quot;</span><span class="p">,</span> <span class="s2">&quot;slope&quot;</span><span class="p">],</span>
+    <span class="n">movement</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">proposal_correction</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>A baseline iSSF is:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">issf</span><span class="o">.</span><span class="n">set_model</span><span class="p">(</span>
+    <span class="n">selection</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;elevation&quot;</span><span class="p">,</span> <span class="s2">&quot;slope&quot;</span><span class="p">],</span>
+    <span class="n">movement</span><span class="o">=</span><span class="s2">&quot;default&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>where <code class="docutils literal notranslate"><span class="pre">movement=&quot;default&quot;</span></code> expands to:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>step_length_km
+log_step_length
+cos_turn_angle
+</pre></div>
+</div>
+<section id="environmental-movement-modifiers">
+<h3>Environmental movement modifiers<a class="headerlink" href="#environmental-movement-modifiers" title="Link to this heading">#</a></h3>
+<p>Conditions at departure can modify the movement kernel:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">issf</span><span class="o">.</span><span class="n">set_model</span><span class="p">(</span>
+    <span class="n">selection</span><span class="o">=</span><span class="p">[</span>
+        <span class="s2">&quot;elevation&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;slope&quot;</span><span class="p">,</span>
+    <span class="p">],</span>
+    <span class="n">modifiers</span><span class="o">=</span><span class="p">{</span>
+        <span class="s2">&quot;heat_start&quot;</span><span class="p">:</span> <span class="s2">&quot;step_length&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;temp_excess_start&quot;</span><span class="p">:</span> <span class="s2">&quot;step_length&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;vrm_start&quot;</span><span class="p">:</span> <span class="s2">&quot;step_length&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;wind_start_support&quot;</span><span class="p">:</span> <span class="s2">&quot;step_length&quot;</span><span class="p">,</span>
+    <span class="p">},</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>The shorthand <code class="docutils literal notranslate"><span class="pre">&quot;step_length&quot;</span></code> means both <code class="docutils literal notranslate"><span class="pre">step_length_km</span></code> and <code class="docutils literal notranslate"><span class="pre">log_step_length</span></code>.</p>
+<p>The package automatically determines whether each modifier is:</p>
+<ul class="simple">
+<li><p><strong>stratum-constant</strong>, such as <code class="docutils literal notranslate"><span class="pre">heat_start</span></code> or <code class="docutils literal notranslate"><span class="pre">vrm_start</span></code>; or</p></li>
+<li><p><strong>candidate-varying</strong>, such as <code class="docutils literal notranslate"><span class="pre">wind_start_support</span></code>.</p></li>
+</ul>
+<p>This distinction remains explicit in the prepared <code class="docutils literal notranslate"><span class="pre">ISSFDesign</span></code>, but users no longer need to manually maintain <code class="docutils literal notranslate"><span class="pre">start_predictors</span></code> and <code class="docutils literal notranslate"><span class="pre">directional_predictors</span></code> in the common workflow.</p>
+<p>Stratum-constant conditions enter only through movement interactions because their main effects cancel from a conditional likelihood. Candidate-varying directional modifiers receive a main effect as well as their requested movement interactions.</p>
+<p>Different modifiers can target different movement components:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">issf</span><span class="o">.</span><span class="n">set_model</span><span class="p">(</span>
+    <span class="n">selection</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;elevation&quot;</span><span class="p">,</span> <span class="s2">&quot;slope&quot;</span><span class="p">],</span>
+    <span class="n">modifiers</span><span class="o">=</span><span class="p">{</span>
+        <span class="s2">&quot;heat_start&quot;</span><span class="p">:</span> <span class="s2">&quot;step_length&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;vrm_start&quot;</span><span class="p">:</span> <span class="s2">&quot;step_length&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;wind_start_support&quot;</span><span class="p">:</span> <span class="p">[</span>
+            <span class="s2">&quot;step_length&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;turning&quot;</span><span class="p">,</span>
+        <span class="p">],</span>
+    <span class="p">},</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>Here only wind support modifies <code class="docutils literal notranslate"><span class="pre">cos_turn_angle</span></code>.</p>
+<p>Inspect the inferred model before fitting:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">issf</span><span class="o">.</span><span class="n">model_spec_</span><span class="o">.</span><span class="n">summary</span><span class="p">()</span>
+
+<span class="n">design</span> <span class="o">=</span> <span class="n">issf</span><span class="o">.</span><span class="n">prepare_design</span><span class="p">()</span>
+<span class="n">design</span><span class="o">.</span><span class="n">predictors</span>
+<span class="n">design</span><span class="o">.</span><span class="n">scaling</span>
+<span class="n">design</span><span class="o">.</span><span class="n">summary</span><span class="p">()</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">set_predictors()</span></code> remains available as a backwards-compatible wrapper but <code class="docutils literal notranslate"><span class="pre">set_model()</span></code> is preferred for new code.</p>
+</section>
+</section>
+<section id="frequentist-fit">
+<h2>7. Frequentist fit<a class="headerlink" href="#frequentist-fit" title="Link to this heading">#</a></h2>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">fit</span> <span class="o">=</span> <span class="n">issf</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
+    <span class="n">engine</span><span class="o">=</span><span class="s2">&quot;fast&quot;</span><span class="p">,</span>
+    <span class="n">method</span><span class="o">=</span><span class="s2">&quot;lbfgs&quot;</span><span class="p">,</span>
+    <span class="n">maxiter</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">fit</span><span class="o">.</span><span class="n">summary</span><span class="p">()</span>
+<span class="n">fit</span><span class="o">.</span><span class="n">coefficients</span><span class="p">()</span>
+<span class="n">fit</span><span class="o">.</span><span class="n">choice_scores</span><span class="p">()[</span><span class="s2">&quot;summary&quot;</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>No-pooling individual fits reuse the same model design and scaling:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">individual</span> <span class="o">=</span> <span class="n">issf</span><span class="o">.</span><span class="n">fit_individuals</span><span class="p">()</span>
+<span class="n">individual</span><span class="o">.</span><span class="n">summary</span>
+</pre></div>
+</div>
+<p>Directional predictor metadata is retained in these individual designs.</p>
+</section>
+<section id="movement-diagnostics">
+<h2>8. Movement diagnostics<a class="headerlink" href="#movement-diagnostics" title="Link to this heading">#</a></h2>
+<p>Expected displacement can be plotted against any movement modifier, including directional modifiers:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">fit</span><span class="o">.</span><span class="n">plot_movement_response</span><span class="p">(</span>
+    <span class="s2">&quot;heat_start&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>or</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">fit</span><span class="o">.</span><span class="n">plot_movement_response</span><span class="p">(</span>
+    <span class="s2">&quot;wind_start_support&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>Step-length distributions can be compared across standardized environmental levels:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">fit</span><span class="o">.</span><span class="n">plot_step_length_distribution</span><span class="p">(</span>
+    <span class="s2">&quot;heat_start&quot;</span><span class="p">,</span>
+    <span class="n">levels</span><span class="o">=</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>and turning-angle distributions can be inspected with:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">fit</span><span class="o">.</span><span class="n">plot_turning_angle_distribution</span><span class="p">(</span>
+    <span class="s2">&quot;wind_start_support&quot;</span><span class="p">,</span>
+    <span class="n">levels</span><span class="o">=</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>These are distributions of net displacement between fixes, not total distance flown.</p>
+</section>
+<section id="bayesian-hierarchy">
+<h2>9. Bayesian hierarchy<a class="headerlink" href="#bayesian-hierarchy" title="Link to this heading">#</a></h2>
+<p>A prepared frequentist analysis can be converted without rebuilding choice sets or resampling the environment:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">bayes</span> <span class="o">=</span> <span class="n">issf</span><span class="o">.</span><span class="n">to_bayesian</span><span class="p">(</span>
+    <span class="n">model_kwargs</span><span class="o">=</span><span class="p">{</span>
+        <span class="s2">&quot;mu_sigma&quot;</span><span class="p">:</span> <span class="mf">1.0</span><span class="p">,</span>
+        <span class="s2">&quot;heterogeneity_sigma&quot;</span><span class="p">:</span> <span class="mf">0.35</span><span class="p">,</span>
+    <span class="p">}</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>Then sample normally:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">bayes_fit</span> <span class="o">=</span> <span class="n">bayes</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
+    <span class="n">sample_kwargs</span><span class="o">=</span><span class="p">{</span>
+        <span class="s2">&quot;draws&quot;</span><span class="p">:</span> <span class="mi">1500</span><span class="p">,</span>
+        <span class="s2">&quot;tune&quot;</span><span class="p">:</span> <span class="mi">1500</span><span class="p">,</span>
+        <span class="s2">&quot;chains&quot;</span><span class="p">:</span> <span class="mi">4</span><span class="p">,</span>
+        <span class="s2">&quot;target_accept&quot;</span><span class="p">:</span> <span class="mf">0.95</span><span class="p">,</span>
+    <span class="p">}</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>For individual <code class="docutils literal notranslate"><span class="pre">i</span></code> and predictor <code class="docutils literal notranslate"><span class="pre">p</span></code>,</p>
+<p>[
+\beta_{ip}=\mu_p+\sigma_p z_{ip},
+\qquad
+z_{ip}\sim N(0,1).
+]</p>
+<p>Population means, partially pooled individual coefficients, and heterogeneity are available separately:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">bayes_fit</span><span class="o">.</span><span class="n">coefficients</span><span class="p">()</span>
+<span class="n">bayes_fit</span><span class="o">.</span><span class="n">individual_coefficients</span><span class="p">()</span>
+<span class="n">bayes_fit</span><span class="o">.</span><span class="n">heterogeneity</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>Bayesian movement-response plots honor both stratum-constant and directional movement modifiers.</p>
+<section id="external-mcmc">
+<h3>External MCMC<a class="headerlink" href="#external-mcmc" title="Link to this heading">#</a></h3>
+<p>External sampling belongs to the analysis object:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">bayes</span><span class="o">.</span><span class="n">export_fit</span><span class="p">(</span><span class="s2">&quot;results/issf_run&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>After the external process saves <code class="docutils literal notranslate"><span class="pre">idata.nc</span></code>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">bayes_fit</span> <span class="o">=</span> <span class="n">bayes</span><span class="o">.</span><span class="n">load_fit</span><span class="p">(</span>
+    <span class="s2">&quot;results/issf_run/idata.nc&quot;</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>The export contains only the model-ready numeric design and metadata; spatial objects and environmental rasters are not serialized.</p>
+</section>
+</section>
+<section id="subsetting-for-smoke-tests">
+<h2>10. Subsetting for smoke tests<a class="headerlink" href="#subsetting-for-smoke-tests" title="Link to this heading">#</a></h2>
+<p>Subsetting always operates on complete strata and reuses existing annotations:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">small</span> <span class="o">=</span> <span class="n">issf</span><span class="o">.</span><span class="n">subset</span><span class="p">(</span>
+    <span class="n">n_strata_per_id</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>
+    <span class="n">seed</span><span class="o">=</span><span class="mi">42</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>The returned object preserves the model specification, including directional modifiers, but resets prepared designs and fits.</p>
+</section>
+<section id="low-level-api">
+<h2>Low-level API<a class="headerlink" href="#low-level-api" title="Link to this heading">#</a></h2>
+<p>The lower-level design API remains available for explicit workflows:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">hsa.ssf</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">ISSFDesign</span><span class="p">,</span>
+    <span class="n">prepare_issf_design</span><span class="p">,</span>
+    <span class="n">build_hierarchical_issf_model</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>The public facade is intentionally thin: statistical preparation, scaling, proposal correction, dense choice arrays, and likelihood construction remain in the established iSSF core.</p>
+</section>
+<section id="current-validation-boundary">
+<h2>Current validation boundary<a class="headerlink" href="#current-validation-boundary" title="Link to this heading">#</a></h2>
+<p>The iSSF API still does not expose the existing SSF cross-validation schemes. Correct iSSF validation must fit environmental scaling inside each training fold and carry proposal correction into held-out choice sets. Until that fold-specific design preparation is implemented, <code class="docutils literal notranslate"><span class="pre">validate()</span></code> raises rather than silently leaking held-out information.</p>
+</section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="ssf.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Step-selection workflows</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="ssf_fast_engine.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Fast frequentist SSF engine</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav id="pst-page-toc-nav" class="page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="pst-show_toc_level nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#create-the-analysis">1. Create the analysis</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#generate-movement-informed-availability">2. Generate movement-informed availability</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#annotate-static-covariates">3. Annotate static covariates</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#annotate-dynamic-covariates">4. Annotate dynamic covariates</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#vector-fields-and-wind-support">5. Vector fields and wind support</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#declare-the-ecological-model">6. Declare the ecological model</a><ul class="pst-show_toc_level nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#environmental-movement-modifiers">Environmental movement modifiers</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#frequentist-fit">7. Frequentist fit</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#movement-diagnostics">8. Movement diagnostics</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#bayesian-hierarchy">9. Bayesian hierarchy</a><ul class="pst-show_toc_level nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#external-mcmc">External MCMC</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#subsetting-for-smoke-tests">10. Subsetting for smoke tests</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#low-level-api">Low-level API</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#current-validation-boundary">Current validation boundary</a></li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+
+  <div class="tocsection sourcelink">
+    <a href="_sources/issf.md.txt">
+      <i class="fa-solid fa-file-lines"></i> Show Source
+    </a>
+  </div>
+</div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="_static/scripts/bootstrap.js?digest=90905a2f556bf617f1a9"></script>
+<script defer src="_static/scripts/pydata-sphinx-theme.js?digest=90905a2f556bf617f1a9"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2026 MolZoo.
+      <br/>
+    
+  </p>
+</div>
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.20.0.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>

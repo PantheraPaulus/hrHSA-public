@@ -1,6 +1,6 @@
 # Getting started
 
-This guide introduces the core **habitat-selection workflow** in hrHSA. Starting from telemetry records and a raster stack of environmental covariates, we will:
+This guide introduces the core **frequentist habitat-selection workflow** in hrHSA. Starting from telemetry records and a raster stack of environmental covariates, we will:
 
 1. prepare and project relocation data;
 2. define the spatial domain considered available;

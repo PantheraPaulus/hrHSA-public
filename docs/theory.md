@@ -1,784 +1,470 @@
 # Theory
 
-## 1. Foundations
+**hrHSA** is built around one central idea: habitat selection is not inferred from where an animal was observed alone, but from how observed use differs from a biologically defined set of alternatives. The analytical framework changes as the definition of those alternatives becomes more local and movement constrained.
 
-### Habitat
-Habitat provides the ecological link between individual movement and population redistribution. By remaining, departing, returning or continuing onwards, animals allocate their time among heterogeneous environments. Repeated over time, these decisions produce patterns of local space use, home-range formation, migration and seasonal range occupation; aggregated across individuals, they generate population-level patterns of distribution and density. Habitat selection therefore connects the relocation of the individual with the organisation of the population (Fretwell & Lucas, 1969; Morris, 2003; Nathan et al., 2008; Mueller & Fagan, 2008; Matthiopoulos et al., 2015).
+The package therefore supports three closely related views of the same ecological process:
 
-Within Habitat Selection Analysis, *habitat* is most usefully understood as a point in environmental space defined by the conjunction of conditions, resources and risks relevant to the focal organism (Morris, 2003; Matthiopoulos et al., 2020; Northrup et al., 2022). Conditions influence physiological or behavioural functioning; resources are required for maintenance, growth or reproduction; and risks reduce expected survival or reproductive success. Habitat is therefore organism-specific: the same geographic location may present different opportunities and constraints to individuals differing in state, experience or perceptual capacity.
+| Question | Availability | Likelihood | hrHSA route |
+| --- | --- | --- | --- |
+| Which parts of a broader landscape are used disproportionately? | A spatial domain such as an individual's range or study area | Use--availability logistic model / point-process approximation | RSF |
+| Which reachable endpoint was chosen at the next movement step? | Alternatives generated from the current location and movement kernel | Conditional logistic / categorical softmax | SSF |
+| How do habitat and environmental conditions modify movement itself? | Movement-generated alternatives with proposal correction | Integrated conditional-choice model | iSSF |
 
-Several related terms must be distinguished. *Use* is the realised allocation of an animal’s time or activity to a habitat. *Occupancy* denotes physical presence within a spatial unit during a defined period. *Availability* describes the habitats that could have been encountered or used, given the spatial, temporal and behavioural constraints acting upon the animal. *Selection* is differential use relative to that availability, whereas *preference*, in its strict sense, describes selection where all alternatives are equally available (Johnson, 1980; Manly et al., 2002; Lele et al., 2013).
+Frequentist and Bayesian inference are available across these routes to different degrees. They are not different ecological theories: they are alternative ways to estimate the same underlying selection and movement relationships, with the Bayesian formulations additionally representing hierarchical variation and posterior uncertainty explicitly.
 
-For habitat types $h=1,\ldots,H$, let $a_h$ denote the proportion of available habitat belonging to type $h$, and let $u_h$ denote its proportion of observed use. For $a_h>0$, the elementary selection ratio is
+## 1. Ecological foundations of habitat selection
+
+### Habitat selection is a process, not a map category
+
+Classical habitat-selection theory starts from a simple ecological observation: animals do not merely occur in environments; through movement, settlement, foraging, territoriality and avoidance they continually redistribute themselves among alternatives. The resulting spatial pattern is therefore an outcome of behavioural decisions interacting with environmental opportunity, competition and constraint (Fretwell & Lucas, 1969; Rosenzweig, 1981; Johnson, 1980).
+
+This makes *habitat* organism specific. A land-cover class or raster cell is not intrinsically good, bad, selected or avoided. Its ecological meaning depends upon the resources, conditions, risks and competitors experienced by the focal organism, and may change with season, life-history stage or behavioural state. Habitat-selection analysis consequently asks about relationships between organisms and environmental conditions rather than assigning fixed values to landscape categories.
+
+A telemetry relocation is evidence of **use**. It is not, by itself, evidence of selection, preference or habitat quality. Selection is disproportionate use relative to what was available. In the strict sense, preference refers to what would be chosen if alternatives were equally available, whereas observational telemetry studies usually estimate selection under unequal and constrained availability (Johnson, 1980; Manly et al., 2002; Lele et al., 2013).
+
+For habitat classes $h=1,\ldots,H$, let $u_h$ be the proportion of observed use and $a_h$ the proportion available. A simple selection ratio is
 
 $$
 r_h = \frac{u_h}{a_h}.
 $$
 
-Use is proportional to availability when $r_h=1$, greater than expected when $r_h>1$, and less than expected when $r_h<1$. Selection is thus a relationship between use and availability, not an intrinsic property of the habitat. A widespread habitat may contain many recorded locations while receiving less use than expected from its abundance; a rare habitat may contain few observations while nevertheless receiving strongly disproportionate use.
+Values greater than one indicate use in excess of availability; values below one indicate use below availability. A common habitat may therefore contain many animal locations while nevertheless being used less than expected from its abundance, while a rare habitat may contain few locations but be strongly selected.
 
-### The Ideal Free Distribution
-Although selection is enacted by individuals, habitat value depends partly upon the population already occupying it. Competitors may deplete resources, interfere with foraging, defend territories or exclude subordinate animals. Population distribution is therefore both a consequence of earlier habitat-selection decisions and part of the ecological context governing subsequent ones. Let $N_h$ denote the number or density of animals occupying habitat $h$, and let $\Phi_h(N_h)$ denote the expected per-capita fitness payoff available there. Under competition,
+### The hierarchy of selection
+
+Johnson's (1980) classic formulation makes the scale dependence of selection explicit. He distinguished four nested **orders of selection**:
+
+1. **First-order selection:** the geographical range of a species.
+2. **Second-order selection:** placement of an individual or social group's home range within that geographical range.
+3. **Third-order selection:** use of habitat components within the home range.
+4. **Fourth-order selection:** selection of particular resources or sites during specific activities such as feeding, resting or nesting.
+
+The same environmental feature can be selected at one order and avoided at another. A mountain range may be selected when establishing a home range, for example, while the steepest terrain within that range is avoided during routine movement. Apparent contradictions among habitat-selection studies often arise because they define availability at different orders or spatial grains rather than because animals behave inconsistently.
+
+The four orders should therefore be understood as an ecological hierarchy rather than a rigid statistical classification. Modern telemetry often resolves decisions finer than those envisioned in 1980, including individual movement steps lasting minutes or hours. The central insight nevertheless remains unchanged: **selection can only be interpreted with respect to the set of alternatives appropriate to the decision scale**.
+
+This is why availability is part of the ecological model. It represents a hypothesis about what the animal could have used, given its position, movement capacity, temporal interval, social constraints and the spatial scale of the question. A study-area polygon, an individual range and a one-hour movement kernel answer different biological questions even if the same environmental predictors are used.
+
+### Habitat choice, density and fitness
+
+Habitat quality need not be independent of the animals already occupying it. Classical **Ideal Free Distribution** theory formalized habitat choice as a density-dependent process (Fretwell & Lucas, 1969). Let $N_h$ denote the number or density of animals in habitat $h$, and let $\Phi_h(N_h)$ denote the expected per-capita fitness payoff obtained there. Under competition,
 
 $$
 \frac{\partial \Phi_h(N_h)}{\partial N_h} < 0,
 $$
 
-so that habitat value declines as density increases. Habitat selection is therefore inherently density dependent (Fretwell & Lucas, 1969; Rosenzweig, 1981; Morris, 2003; McLoughlin et al., 2010).
+so increasing density reduces the payoff available to each individual.
 
-The classical formulation of this relationship is the **Ideal Free Distribution** of Fretwell and Lucas (1969). The term *ideal* assumes that individuals can distinguish the relative payoffs of available habitats; the term *free* assumes that they may move among them without prohibitive costs or exclusion. Consider a population of total size $N$ distributed among $H$ habitats, with $N_h^{*}$ individuals occupying habitat $h$ at equilibrium:
-
-$$
-\sum_{h=1}^{H} N_h^{*} = N.
-$$
-
-An ideal-free equilibrium is reached when no individual could improve its expected fitness by moving elsewhere. All occupied habitats therefore provide the same equilibrium payoff $\lambda$:
+Under the ideal-free assumptions, animals can assess habitat profitability and move freely among alternatives. At equilibrium, every occupied habitat yields the same expected payoff $\lambda$:
 
 $$
-\Phi_h\left(N_h^{*}\right)
-=
-\lambda
+\Phi_h(N_h^*) = \lambda
 \qquad
-\text{for all } h \text{ with } N_h^{*}>0,
+\text{for all occupied habitats }h,
 $$
 
-while any unoccupied habitat offers no greater return:
+while an unoccupied habitat offers no greater payoff. A highly productive habitat can therefore contain more animals than a poorer habitat without providing greater realised fitness to each occupant: its higher density is precisely what reduces its payoff toward the common equilibrium.
+
+The **Ideal Despotic Distribution** relaxes the assumption of free access. Dominant individuals may monopolise high-quality territories or exclude competitors, forcing subordinates into habitats with lower expected payoffs. Observed space use can consequently reflect habitat productivity, density, social rank, territoriality and access simultaneously. Selection patterns should not automatically be read as unconstrained expressions of preference.
+
+This classical theory also explains why **use, density and habitat quality are not interchangeable**. Van Horne (1983) famously showed why high animal density can be a misleading indicator of habitat quality: crowding, social exclusion or demographic source--sink structure can produce high occupancy without high individual performance. Conversely, a sparsely used habitat need not be intrinsically poor if access is restricted or if it is rare. Habitat-selection coefficients quantify behavioural redistribution relative to availability; they do not by themselves establish survival, reproduction or fitness consequences.
+
+Rosenzweig (1981) further developed habitat selection as an ecological process linking habitat profitability, competition and population distribution. In this view, the spatial distribution observed by a telemetry study is not simply a response to environmental heterogeneity. It is also part of the ecological context within which subsequent choices are made.
+
+hrHSA does not automatically model density dependence, dominance or fitness. These processes must enter explicitly through predictors, grouping structure, interactions, demographic outcomes or a model designed for that question. The important principle is that a selection coefficient is conditional on the ecological and social context represented in the fitted data.
+
+### Movement as constrained choice
+
+Classical optimal-foraging theory likewise emphasized that animals choose among alternatives subject to travel costs and changing returns. MacArthur & Pianka (1966) and Charnov's (1976) marginal value theorem showed that the value of a patch cannot be separated from the cost of reaching alternatives or from the rate at which returns change through time. Modern step-selection methods do not require animals to be optimal foragers, but they inherit the same ecological lesson: **what is reachable affects what can be chosen**.
+
+At broad scales, accessibility may be approximated by a home range or other spatial domain. At fine temporal scales, however, the animal's present location, elapsed time and movement capacity sharply constrain the next set of alternatives. The progression from RSF to SSF and iSSF is therefore not merely a progression in statistical sophistication. It represents increasingly explicit models of the ecological choice set.
+
+Telemetry observes this continuous movement process only at discrete times. Let $S_i(t)$ denote the true location of individual $i$ and let the recorded relocations be
 
 $$
-\Phi_h(0)
-\leq
-\lambda
-\qquad
-\text{when } N_h^{*}=0.
+\mathcal{D}_i = \{\tilde{s}_{ij},t_{ij}\}_{j=1}^{n_i}.
 $$
 
-A habitat with a high initial payoff may consequently be occupied first, but the arrival of additional individuals reduces its per-capita value. Once its payoff falls to that available elsewhere, individuals distribute themselves among habitats in the proportions required to maintain equal expected fitness. Habitats of greater productive capacity may therefore support greater animal densities without providing greater realised fitness at equilibrium: their greater density is precisely what reduces the individual payoff to that available in alternative habitats.
+The observed fixes are shaped by movement, residence time, return behaviour, fix schedule, positional error and potentially habitat-dependent fix success. Habitat-selection models should therefore be interpreted as models of relative use or local choice conditional on the observation and availability definitions supplied to them.
 
-For two habitats, combinations of densities satisfying
+## 2. Resource Selection Functions
 
-$$
-\Phi_1(N_1)=\Phi_2(N_2)
-$$
+### Point-process interpretation
 
-form an **isodar** (Morris, 1987, 1988, 2003). The isodar intercept represents differences in habitat profitability at low density, whereas its slope represents differences in the rate at which fitness declines with crowding. Ideal-free and isodar theory thus provide a formal bridge between individual habitat choice, density-dependent competition and population distribution.
-
-### The Ideal Despotic Distribution
-
-The assumptions of the Ideal Free Distribution provide a theoretical reference condition rather than a universal description of nature. Individuals differ in information, state and competitive ability; movement may be costly; and dominant animals may monopolise profitable habitats. Such processes may produce an **Ideal Despotic Distribution**, in which subordinate individuals occupy less profitable habitats despite the existence of superior alternatives (Fretwell & Lucas, 1969). Observed distributions may therefore reflect habitat profitability, competition, restricted access and social organisation in combination.
-
-Habitat selection is also hierarchical and scale dependent. Johnson (1980) distinguished selection of a species’ geographical range, placement of an individual home range within that range, use of habitat components within the home range and selection of particular resources within an activity site. A habitat may be selected at one order and avoided at another, or selected for one activity and avoided during another. Availability is therefore an ecological hypothesis concerning the alternatives accessible to an animal at a particular time and scale, rather than a purely geometric property of the study area.
-
-Habitat Selection Analysis begins from these premises. Animals respond to environmental heterogeneity through movement and space use; their decisions produce population distributions; and the resulting densities alter the value of habitats subsequently encountered. The inferential question that follows is how this relationship may be recovered from observations of animal relocations and measured environmental features.
-
-## 2. Making it real: Towards Inference from Empirical Data
-
-### From Relocations to Selection
-
-Habitat selection is a behavioural process, but telemetry records only a finite sample of its spatial consequences. Let $S_i(t)$ denote the location of individual $i$ at time $t$. A tracking device observes this continuous trajectory only at discrete times $t_{ij}$, producing the relocation series
+For a spatial domain $\Omega$, an RSF can be viewed through an inhomogeneous point-process intensity
 
 $$
-\mathcal{D}_i
+\lambda(s) = c\,f^A(s)\,w\{x(s)\},
+$$
+
+where $f^A(s)$ describes the available spatial distribution, $x(s)$ is the environmental vector at location $s$, $c$ controls total intensity and
+
+$$
+w(x) = \exp(x\beta)
+$$
+
+is the resource-selection function.
+
+Conditional on the number of observed relocations, the implied use distribution is
+
+$$
+f^u(s)
 =
-\left\{
-\tilde{s}_{ij},t_{ij}
-\right\}_{j=1}^{n_i},
+\frac{f^A(s)w\{x(s)\}}
+{\int_\Omega f^A(r)w\{x(r)\}\,dr}.
 $$
 
-where $\tilde{s}_{ij}$ may differ from the true location because of positional error. The observed sample is further conditioned upon the fix schedule and the probability of successfully recording a location.
+The selection function therefore **reweights availability**. Its absolute scale is arbitrary; relative differences are the primary inferential quantity.
 
-A concentration of relocations in one part of the landscape may therefore arise because the habitat is selected, because it is readily accessible, because the animal moves slowly within it, or because it repeatedly returns to the same area. Conversely, few relocations may indicate avoidance, restricted access, rapid passage or reduced fix success. Selection cannot be inferred from observations of use alone; the observed distribution must be compared with an explicit model of what was available to the animal.
+### Use--availability logistic approximation
 
-### Resource Selection as a Point Process
-
-Consider a spatial domain $\Omega\subset\mathbb{R}^{2}$ containing observed relocations
+In practice the spatial integral is approximated by sampling available locations and combining them with observed locations:
 
 $$
-\mathcal{S}
-=
-\left\{
-s_1,\ldots,s_n
-\right\}.
-$$
-
-Spatial use may be represented by an **inhomogeneous Poisson point process**. If $N(B)$ denotes the number of relocations observed within a region $B\subseteq\Omega$, then
-
-$$
-N(B)
-\sim
-\operatorname{Poisson}
-\left(
-\int_B \lambda(s)\,ds
-\right),
-$$
-
-where $\lambda(s)>0$ is the spatial intensity of relocations.
-
-Environmental heterogeneity is commonly introduced through a log-linear intensity:
-
-$$
-\lambda(s)
-=
-\exp\left[
-\beta_0+x(s)\beta
-\right],
-$$
-
-where $x(s)$ is a row vector of environmental covariates and $\beta$ is the corresponding vector of coefficients. This may be written as
-
-$$
-\lambda(s)
-=
-\exp(\beta_0)w\left(x(s)\right),
-$$
-
-with the selection function
-
-$$
-w(x)
-=
-\exp(x\beta).
-$$
-
-The function $w(x)$ describes how habitat alters the relative intensity of use. It is not the absolute probability that a spatial unit will be occupied or used.
-
-Where locations differ in their accessibility, the intensity may be written more generally as
-
-$$
-\lambda(s)
-=
-c\,f^{A}(s)w\left(x(s)\right),
-$$
-
-where $f^{A}(s)$ is the available distribution and $c>0$ controls the expected number of observations. Conditional upon observing $n$ relocations, the corresponding use distribution is
-
-$$
-f^{u}(s)
-=
-\frac{
-f^{A}(s)w\left(x(s)\right)
-}{
-\displaystyle
-\int_{\Omega}
-f^{A}(r)w\left(x(r)\right)\,dr
-}.
-$$
-
-The available environment is thus reweighted by the selection function to produce the expected distribution of use.
-
-The intercept has little direct biological meaning in a conventional telemetry analysis because the total number of relocations depends upon the fix schedule, study duration and number of tracked animals. The coefficients in $\beta$, by contrast, describe relative differences in the intensity of use, conditional upon the defined available distribution.
-
-### Approximation by Logistic Regression
-
-The likelihood of an inhomogeneous Poisson point process contains an integral over the full spatial domain:
-
-$$
-L(\beta)
-\propto
-\exp
-\left[
--\int_{\Omega}\lambda(s)\,ds
-\right]
-\prod_{i=1}^{n}
-\lambda(s_i).
-$$
-
-For realistic landscapes, this integral must usually be approximated numerically. In a use--availability design, environmental conditions are evaluated at the observed relocations and at locations sampled from the available distribution.
-
-Let
-
-$$
-Y_j
-=
+Y_j =
 \begin{cases}
-1, & \text{if location }j\text{ is used},\\
-0, & \text{if location }j\text{ is sampled from availability}.
+1, & \text{used location},\\
+0, & \text{sampled available location}.
 \end{cases}
 $$
 
-The combined sample may be fitted using logistic regression:
+A logistic model is then fitted,
 
 $$
-\operatorname{logit}
-\left[
-\Pr(Y_j=1\mid x_j)
-\right]
+\operatorname{logit}\{P(Y_j=1\mid x_j)\}
 =
 \alpha+x_j\beta.
 $$
 
-Available locations are not biological absences. They represent the environmental distribution from which the animal could have selected and provide a numerical approximation to the point-process integral. As the available sample becomes sufficiently large, the logistic slopes approach those of the underlying point-process model (Johnson et al., 2006; Warton & Shepherd, 2010; Aarts et al., 2012).
+The available points are not biological absences. Their number is controlled by the analyst and approximates the available environmental distribution. Consequently, the logistic intercept depends on the used:available sampling ratio and is not normally interpreted as an ecological occupancy probability. As the available sample becomes sufficiently dense, the slopes approximate those of the underlying point-process formulation (Johnson et al., 2006; Warton & Shepherd, 2010; Aarts et al., 2012).
 
-The logistic intercept $\alpha$ depends upon the analyst-defined ratio of used to available locations and should not ordinarily be interpreted. Predictions should therefore be based upon the exponential selection function
+### Relative selection strength
 
-$$
-\hat{w}(x)
-=
-\exp(x\hat{\beta}),
-$$
-
-rather than the fitted logistic probability
-
-$$
-\frac{
-\exp(\alpha+x\hat{\beta})
-}{
-1+\exp(\alpha+x\hat{\beta})
-}.
-$$
-
-The number of available locations should be increased until the estimated slopes stabilise. Additional available points improve numerical integration but do not create additional biological replication.
-
-### Interpretation of an RSF
-
-For two environmental conditions $x_1$ and $x_0$, their relative selection strength is
+For two environmental conditions $x_1$ and $x_0$,
 
 $$
 \operatorname{RSS}(x_1,x_0)
 =
-\frac{
-\hat{w}(x_1)
-}{
-\hat{w}(x_0)
-}
+\frac{w(x_1)}{w(x_0)}
 =
-\exp
-\left[
-(x_1-x_0)\hat{\beta}
-\right].
+\exp\{(x_1-x_0)\beta\}.
 $$
 
-For two otherwise identical locations differing by one unit in covariate $x_j$,
+For a one-unit difference in a single linear predictor, holding all other terms constant,
 
 $$
-\operatorname{RSS}
-=
-\exp(\hat{\beta}_j).
+\operatorname{RSS}=\exp(\beta_j).
 $$
 
-Values greater than one indicate greater relative selection for the first condition; values below one indicate lower relative selection. These contrasts remain conditional upon the other model terms, the available domain and the scale of analysis.
+This interpretation becomes conditional when the model contains quadratic terms, categorical effects or interactions. In those models, prediction and explicit contrasts are safer than reading coefficients one at a time.
 
-Interactions, transformations and nonlinear effects should be interpreted through explicit contrasts rather than through isolated coefficients. A mapped RSF surface,
-
-$$
-\hat{w}\left(x(s)\right)
-=
-\exp\left[x(s)\hat{\beta}\right],
-$$
-
-has an arbitrary absolute scale. It may be normalised within a defined available domain to obtain
+An RSF surface
 
 $$
-\hat{f}^{u}(s)
-=
-\frac{
-f^{A}(s)\hat{w}\left(x(s)\right)
-}{
-\displaystyle
-\int_{\Omega}
-f^{A}(r)\hat{w}\left(x(r)\right)\,dr
-},
+\hat{w}\{x(s)\}=\exp\{x(s)\hat\beta\}
 $$
 
-but the resulting distribution is specific to that domain.
+is likewise a map of **relative selection**, not a calibrated probability of occupancy or habitat quality. It may be normalized within a specified available domain, but the resulting distribution remains conditional on that domain.
 
-### Individuals and Autocorrelation
+## 3. Individuals, hierarchy and partial pooling
 
-Telemetry studies may contain many relocations but comparatively few animals. Locations from the same individual are repeated observations of one behavioural process and should not be treated as independent population replicates.
+Telemetry studies often contain thousands or millions of fixes but far fewer independently sampled animals. Treating every relocation as a population replicate therefore produces false precision.
 
-Individual variation may be represented hierarchically:
-
-$$
-w_i(x)
-=
-\exp(x\beta_i),
-$$
-
-with
+Individual-specific responses can be represented as
 
 $$
-\beta_i
-\sim
-\mathcal{N}(\mu,\Sigma),
+\beta_i = \mu_\beta + b_i,
+\qquad
+b_i \sim \mathcal{N}(0,\Sigma_\beta).
 $$
 
-where $\mu$ describes the population-level response and $\Sigma$ describes variation among individuals. Random slopes are important because animals may differ in the direction or strength of selection. A random intercept alone does not represent such behavioural variation.
+The population mean $\mu_\beta$ describes the average response, while $\Sigma_\beta$ describes between-individual heterogeneity and correlation among responses. Covariates describing sex, age, population or behavioural state can be added at the individual level when the ecological question requires them.
 
-Successive relocations are also serially dependent. An animal's current position constrains its next position, and nearby observations commonly share similar environmental conditions. Ignoring this dependence generally leads to underestimated uncertainty.
+Hierarchical Bayesian models implement **partial pooling**. Animals with informative data retain strongly individual estimates, whereas poorly informed individuals are pulled toward the population distribution. This avoids both complete pooling and fitting every animal in isolation.
 
-Autocorrelation should not automatically be removed by thinning the data until successive points appear independent. Residence, return and slow movement may themselves be biologically meaningful. More defensible approaches include hierarchical models, robust standard errors, block bootstrapping, two-stage analyses and structured cross-validation.
+The distinction between a population-average response, individual-specific coefficients and between-individual heterogeneity is important. In hrHSA these quantities are exposed separately in Bayesian RSF, SSF and iSSF results rather than collapsed into one coefficient table.
 
-### Model Evaluation
-
-Evaluation should be based upon held-out data and should reflect the intended form of prediction. Interpolation within known individuals, prediction to later periods and transfer to new individuals are distinct tasks.
-
-A commonly used measure for presence-only or use--availability predictions is the **continuous Boyce index**. Let $\hat{w}(s)$ denote the predicted RSF value in an evaluation dataset. The prediction range is divided into intervals or moving windows $I_k$. For each interval, calculate the proportion of held-out used locations,
+Because the exponential selection function is nonlinear,
 
 $$
-P_k
-=
-\frac{
-\text{held-out used locations in }I_k
-}{
-\text{all held-out used locations}
-},
+E_i[\exp(x\beta_i)]
+\neq
+\exp\{xE_i(\beta_i)\},
 $$
 
-and the proportion of available locations,
+so the prediction for an average coefficient vector is not necessarily the same as the average prediction across heterogeneous individuals.
+
+Ecologically, between-individual heterogeneity is not merely statistical noise. Persistent differences can reflect age, sex, reproductive state, experience, dominance, behavioural specialization or access to different environments. They may also change the effective availability experienced by different animals. A population-level coefficient should therefore be interpreted as a distributional summary of individuals, not as a literal description of an interchangeable "average animal".
+
+## 4. Dependence and predictive validation
+
+Successive relocations from the same animal are serially dependent. That dependence is not merely a nuisance: slow movement, residence and repeated return may be biologically meaningful. Arbitrarily thinning a trajectory until points appear independent can remove part of the process being studied.
+
+Validation should instead respect the intended prediction task.
+
+For RSFs, hrHSA distinguishes especially between:
+
+- **transfer to a new individual**, evaluated with leave-one-individual-out validation;
+- **finite held-out sample uncertainty**, evaluated with temporally blocked bootstrap resampling; and
+- **temporal non-stationarity**, evaluated by scoring real contiguous time periods.
+
+The continuous Boyce index is used as a rank-based RSF validation metric. If $P_k$ is the proportion of held-out used locations in prediction interval $k$ and $E_k$ is the corresponding proportion of available locations,
 
 $$
-E_k
-=
-\frac{
-\text{available locations in }I_k
-}{
-\text{all available locations}
-}.
+R_k = \frac{P_k}{E_k},
 $$
 
-Their ratio is
+and the Boyce index is the Spearman correlation between prediction rank and $R_k$. A high value indicates that higher predicted selection corresponds to disproportionately greater held-out use. The full predicted-to-expected curve should be retained because a single correlation coefficient can hide where a model fails.
+
+Frequentist and Bayesian validation intervals do not represent exactly the same uncertainty. A frequentist blocked bootstrap in hrHSA holds the fitted model fixed and resamples held-out temporal blocks, whereas the Bayesian version can additionally pair bootstrap replicates with posterior coefficient draws.
+
+## 5. Step Selection Functions
+
+### Availability becomes local
+
+At fine temporal resolution, a broad RSF availability domain becomes difficult to justify. A location may lie inside an animal's range but be unreachable during the interval between two telemetry fixes. This is the step-selection analogue of Johnson's scale argument: the ecological choice set has moved from a broad landscape to the alternatives reachable from the animal's current state.
+
+A step connects consecutive relocations,
 
 $$
-R_k
-=
-\frac{P_k}{E_k}.
+s_t \longrightarrow s_{t+1},
 $$
 
-The Boyce index is the Spearman rank correlation between the representative prediction value $v_k$ and the predicted-to-expected ratio:
+with length
 
 $$
-B
-=
-\operatorname{cor}_{\mathrm{S}}
-\left(
-v_k,R_k
-\right).
+L_t = \lVert s_{t+1}-s_t\rVert
 $$
 
-Values approaching $1$ indicate that greater predictions correspond to greater use relative to availability. Values near $0$ indicate little monotonic relationship, while negative values indicate that held-out locations occur disproportionately in areas assigned low predictions.
+and turning angle $\theta_t$ relative to the preceding movement direction.
 
-The Boyce index evaluates ranking rather than complete probabilistic calibration. It does not preserve the magnitude or geographic location of prediction errors and may depend upon window width, ties and sample size. It should therefore be accompanied by the full predicted-to-expected curve, observed and expected use across prediction quantiles, and spatial inspection of held-out residual patterns.
-
-### Structured Cross-Validation
-
-Randomly dividing relocations among folds is generally unsuitable for telemetry data. Neighbouring observations from the same movement bout may enter both the training and evaluation sets, producing information leakage and overly optimistic performance estimates.
-
-For prediction to another period within the same animals, data should be divided into contiguous **temporal blocks**. Blocks should be sufficiently long to reduce dependence between training and evaluation observations. Where forecasting is the objective, models should be fitted to earlier periods and evaluated on later ones.
-
-For inference to the wider population, **leave-one-individual-out cross-validation** is more appropriate. All relocations from one animal are withheld, the model is fitted to the remaining animals, and its predictions are evaluated against the held-out individual. Repeating this procedure assesses whether the estimated population response transfers to animals not represented during fitting.
-
-Where both temporal transfer and population transfer matter, the two schemes may be combined. An outer leave-one-individual-out loop can assess generalisation to new animals, while temporally blocked validation within the training animals can guide model development.
-
-Validation scores should be reported by individual and fold. A single pooled score may be dominated by animals contributing the greatest number of relocations.
-
-### From Resource Selection to Step Selection
-
-A conventional RSF usually compares every relocation with a common availability distribution, such as an individual's home range or the study area. At fine temporal scales, this assumption becomes difficult to defend. A location may lie within the home range but remain unreachable during the interval between two fixes.
-
-Movement therefore determines availability. The locations accessible at time $t+1$ depend upon the animal's position at time $t$, the elapsed time, its movement capacity and its previous direction of travel.
-
-A **step** is the displacement between consecutive relocations:
-
-$$
-s_t
-\longrightarrow
-s_{t+1}.
-$$
-
-Its length is
-
-$$
-l_t
-=
-\left\|
-s_{t+1}-s_t
-\right\|,
-$$
-
-and its turning angle $\theta_t$ is the change in bearing relative to the preceding step.
-
-In a **Step Selection Function**, each observed step is paired with available steps beginning at the same location. Their lengths and turning angles are conventionally sampled from the empirical distributions of observed movements. Habitat conditions at the observed endpoint or along the observed path are then compared with those of the available alternatives.
-
-Let
+In an SSF, each observed endpoint is compared with alternatives generated from the same starting location using a movement-informed proposal. The resulting choice set is
 
 $$
 \mathcal{C}_t
 =
-\left\{
-s_{t+1}^{(0)},
-s_{t+1}^{(1)},
-\ldots,
-s_{t+1}^{(K)}
-\right\}
+\{s_{t+1}^{(0)},s_{t+1}^{(1)},\ldots,s_{t+1}^{(K)}\},
 $$
 
-denote the choice set for step $t$, where $s_{t+1}^{(0)}$ is the observed endpoint. Under conditional logistic regression,
+where candidate $0$ is the observed endpoint.
+
+For predictor vector $x_{tj}$,
 
 $$
-\Pr
-\left(
-j\mid\mathcal{C}_t
-\right)
+P(j\mid\mathcal{C}_t)
 =
-\frac{
-\exp\left(z_{tj}\gamma\right)
-}{
-\displaystyle
-\sum_{k=0}^{K}
-\exp\left(z_{tk}\gamma\right)
-}.
+\frac{\exp(x_{tj}\beta)}
+{\sum_k\exp(x_{tk}\beta)}.
 $$
 
-An SSF therefore asks which characteristics distinguished the chosen step from the alternatives reachable from the same starting point.
+The likelihood is conditional on the choice set. A stratum intercept is therefore unnecessary: adding the same constant to every alternative in a stratum cancels under the softmax.
 
-### Integrated Step Selection
+### Static and dynamic environmental conditions
 
-Empirical step-length and turning-angle distributions have already been shaped by habitat selection. Short observed steps, for example, may reflect intrinsically slow movement or prolonged residence in selected habitat. Sampling available movements directly from the observed distributions therefore risks confounding movement with selection.
+Candidate endpoints may be annotated with static terrain variables and with time-varying fields such as temperature, uplift or wind. The ecological timing must remain explicit. In the current iSSF workflow the natural convention is:
 
-An **integrated Step Selection Function** estimates the movement and selection processes jointly. Let $\phi$ denote the baseline movement kernel and $w$ the habitat-selection function. The transition density is
+- endpoint conditions are sampled at `end_time`;
+- departure conditions are sampled at `start_time`.
+
+Vector fields require additional care. A wind vector at an endpoint can be projected onto each candidate's geodesic bearing. Positive support corresponds to a tailwind component, negative support to headwind. When the same start-of-step wind vector is projected onto different candidate bearings, the resulting directional support still varies among alternatives and is therefore identifiable in a conditional-choice likelihood.
+
+### Selection opportunity
+
+A coefficient can be weakly estimated because an animal rarely encountered contrasting alternatives, even when its biological response was strong. For predictor $k$, the conditional information contributed by stratum $s$ is related to
 
 $$
-p
-\left(
-s_{t+1}
-\mid
-s_t,s_{t-1}
-\right)
+I_{s,k}=\operatorname{Var}_{p_s}(x_{s,j,k}).
+$$
+
+Low within-choice-set contrast limits information. hrHSA therefore separates **selection opportunity** from coefficient magnitude and also exposes conditional information inflation diagnostics for overlapping predictors. This distinction is particularly useful when comparing individuals that moved through different environmental landscapes.
+
+Ecologically, selection opportunity is the local counterpart of availability. An animal cannot demonstrate a choice between conditions that it did not encounter as meaningful alternatives. Differences in estimated selection among individuals can consequently arise from differences in response, differences in opportunity, or both.
+
+### SSF validation
+
+For SSFs, prediction is evaluated on the conditional choice scale. hrHSA uses the gain over a uniform choice model,
+
+$$
+G_s
 =
-\frac{
-\phi
-\left(
-s_{t+1}
-\mid
-s_t,s_{t-1};\theta
-\right)
-w
-\left(
-x(s_{t+1});\beta
-\right)
-}{
-\displaystyle
-\int_{\Omega}
-\phi
-\left(
-r
-\mid
-s_t,s_{t-1};\theta
-\right)
-w
-\left(
-x(r);\beta
-\right)\,dr
-}.
+\log p_{\text{model}}(y_s)
+-
+\log(1/J_s),
 $$
 
-The movement kernel determines which locations can be reached and with what baseline probability. The selection function then reweights those locations according to habitat. Movement and selection together determine the next relocation.
+where $J_s$ is the number of alternatives in stratum $s$. Positive gain indicates better prediction than uniform choice. Exact temporal-block and leave-one-individual-out validation answer different questions from PSIS-LOO on already fitted strata and should not be treated as interchangeable.
 
-Terms such as $l$, $\log l$ and $\cos\theta$ allow parameters of step-length and turning-angle distributions to be estimated alongside habitat-selection coefficients. The resulting model separates the baseline movement process from the effects of environmental conditions more explicitly than a conventional SSF (Avgar et al., 2016).
+## 6. Integrated Step Selection Functions
 
-### Interpretation Through Simulation
+A conventional SSF uses a fitted movement distribution to generate available steps and then estimates habitat selection conditional on that proposal. But the observed movement distribution has itself already been shaped by habitat. iSSF addresses this by estimating movement and habitat terms jointly while correcting for the candidate-generation distribution.
 
-An SSF or iSSF coefficient describes a local contrast among alternatives available from the same starting point. For two candidates $a$ and $b$,
+This returns to the classical ecological idea that movement costs and habitat rewards are inseparable components of choice. The iSSF does not assume optimal behaviour in the sense of MacArthur & Pianka (1966) or Charnov (1976), but it makes the movement constraints that define the choice set part of the fitted ecological process rather than treating them only as sampling machinery.
+
+### Proposal correction
+
+Let $q_{sj}$ be the density under the movement proposal used to generate candidate $j$ in stratum $s$. hrHSA uses the proposal-corrected utility
 
 $$
-\frac{
-\Pr(a\mid\mathcal{C}_t)
-}{
-\Pr(b\mid\mathcal{C}_t)
-}
+\eta_{sj}
 =
-\exp
-\left[
-\eta_{ta}-\eta_{tb}
-\right].
+x_{sj}^{T}\beta
+-
+\log q_{sj}.
 $$
 
-Such contrasts remain directly interpretable. The long-term consequences of the coefficients are less immediate because each selected endpoint determines the next choice set. Movement and selection therefore alter both the present choice and the locations available in the future.
+The offset
 
-Predicted utilisation distributions, residence times, crossing probabilities and home-range geometry should consequently be obtained through simulation of the complete transition process. At each step, candidate movements are drawn from the fitted movement kernel, weighted according to habitat, and sampled to produce the next location. Repetition generates trajectories whose emergent spatial patterns can be compared with held-out observations.
+$$
+o_{sj}=-\log q_{sj}
+$$
 
-RSFs, SSFs and iSSFs therefore represent a progression in the treatment of availability. An RSF relates use to a broader and approximately static available distribution. An SSF conditions availability upon the animal's previous location. An iSSF jointly estimates the movement process generating those local alternatives and the habitat-selection process distinguishing among them. The appropriate framework depends upon the temporal scale of the data and the inferential question being addressed.
-# Towards Bayesian Inference
+is an importance-sampling correction, not an ecological coefficient. It may be centered within a stratum because any common additive constant cancels from the conditional likelihood.
 
-The preceding models commonly proceed as though recorded locations were exact, environmental covariates were known without error, individuals differed only through random sampling, and habitat-selection relationships remained constant through time. Each assumption is convenient; none is generally true. A Bayesian analysis is not the only means of relaxing them, but it provides a coherent framework in which uncertain observations, latent ecological processes, individual heterogeneity and temporal change may be represented jointly and propagated into the final inference.
+This distinction is fundamental: **availability generation and the ecological movement model are not the same object**. The proposal is a computational device for drawing candidate steps; the fitted movement terms describe the ecological kernel after proposal correction.
 
-Let $\mathcal{D}$ denote the observed data, $\mathcal{Z}$ the unobserved ecological quantities from which those data arose, and $\Theta$ the model parameters. Bayesian inference proceeds from the posterior distribution
+### Movement basis
+
+The default movement basis in hrHSA is
+
+$$
+L,\qquad \log L,\qquad \cos\theta.
+$$
+
+When the coefficients on $L$ and $\log L$ imply a proper Gamma-like step-length kernel,
+
+$$
+k = 1+\gamma_{\log L},
+\qquad
+\lambda=-\gamma_L,
+$$
+
+with expected displacement
+
+$$
+E[L]=\frac{k}{\lambda}.
+$$
+
+The corresponding turning term governs directional persistence. These movement quantities describe displacement between fixes; they are not the animal's total travelled distance along an unresolved path.
+
+### Environmental movement modifiers
+
+Conditions at departure can alter the movement kernel. For example, heat, ruggedness or wind support can interact with $L$, $\log L$ or $\cos\theta$.
+
+A start condition that is constant for every alternative in a stratum cannot be estimated as a standalone main effect because that constant cancels from the conditional likelihood. It becomes identifiable through its interaction with candidate-varying movement terms. By contrast, a directional quantity such as start-wind support may vary among candidate bearings and can therefore have both a main effect and movement interactions.
+
+This leads to an important interpretive distinction. Suppose ruggedness modifies both $L$ and $\log L$. The fitted linear predictor may be additive on the coefficient scale, but expected displacement is a nonlinear transformation of the movement coefficients. Consequently, movement-response curves evaluated under different environmental conditions may diverge even when the underlying interaction structure is simple. hrHSA therefore provides derived movement-response and step-length-distribution plots rather than encouraging interpretation from isolated interaction coefficients.
+
+### Hierarchical iSSF
+
+For individual $i$ and predictor $p$, the Bayesian iSSF uses partially pooled coefficients of the form
+
+$$
+\beta_{ip}
+=
+\mu_p+\sigma_pz_{ip},
+\qquad
+z_{ip}\sim\mathcal{N}(0,1).
+$$
+
+This allows both habitat-selection terms and movement responses to vary among animals while retaining a population distribution.
+
+### Current validation boundary
+
+The iSSF workflow deliberately does **not** yet expose the SSF cross-validation schemes. Correct validation must refit environmental scaling within every training fold and preserve proposal correction in held-out choice sets. Until that fold-specific preparation is implemented, hrHSA raises rather than silently leaking information from held-out strata.
+
+## 7. Bayesian inference is an inferential layer
+
+For observed data $\mathcal{D}$, latent quantities $\mathcal{Z}$ and parameters $\Theta$,
 
 $$
 p(\mathcal{Z},\Theta\mid\mathcal{D})
 \propto
 p(\mathcal{D}\mid\mathcal{Z},\Theta)
-p(\mathcal{Z}\mid\Theta)
-p(\Theta).
+\,p(\mathcal{Z}\mid\Theta)
+\,p(\Theta).
 $$
 
-The first term describes the observation process, the second the ecological process and the third the prior information assigned to its parameters. Rather than replacing uncertain quantities by single estimates, the posterior integrates over their plausible values. This distinction is central to three objectives of **hrHSA**: propagating uncertainty, estimating individual variation and detecting change.
+The practical value of the Bayesian formulations in hrHSA is not complexity for its own sake. They support:
 
-## Propagating Locational and Environmental Uncertainty
+- partial pooling across individuals;
+- posterior distributions for population means and heterogeneity;
+- propagation of coefficient uncertainty into predictions and validation;
+- regularization of large correlated predictor sets when a shrinkage prior is explicitly requested; and
+- comparison of ecological effects on a common posterior scale.
 
-Telemetry records an estimate of an animal's location rather than the location itself. Let $s_{ij}$ denote the true location of individual $i$ at observation $j$, and let $\tilde{s}_{ij}$ denote the recorded GNSS fix. A simple observation model is
+A regularized horseshoe prior can stabilize broader candidate models, but shrinkage is not causal variable selection and its local scales are not posterior inclusion probabilities. Highly correlated predictors may support a combined ecological signal more strongly than either coefficient separately.
 
-$$
-\tilde{s}_{ij}
-\mid
-s_{ij},\Sigma_{ij}
-\sim
-\mathcal{N}_2
-\left(
-s_{ij},
-\Sigma_{ij}
-\right),
-$$
-
-where $\Sigma_{ij}$ describes the magnitude and orientation of locational uncertainty. Other distributions may be substituted where errors are heavy-tailed, device-specific or otherwise non-Gaussian. The ecological model is then evaluated at the latent location $s_{ij}$ rather than treating $\tilde{s}_{ij}$ as exact (Jonsen et al., 2005; Patterson et al., 2008; Hooten et al., 2017).
-
-Locational inaccuracy must be distinguished from failed fixes. A recorded fix may be spatially imprecise, whereas a failed fix produces no location at all. If fix success depends upon canopy cover, topography or other habitat features, the observed relocations constitute a biased sample of the underlying path. The observation process may therefore require both a model for positional error and a model for the probability of detection or successful acquisition (Frair et al., 2004; Nielson et al., 2009).
-
-Environmental data are likewise imperfect. Let $x^{*}(s,t)$ denote the environmental field relevant to the animal and let $\tilde{x}_g$ denote the value represented by raster cell $g$, covering area $A_g$. A continuous raster variable may be viewed as an imperfect spatial aggregate:
+Dynamic environmental covariates and time-varying coefficients should also be distinguished. hrHSA currently supports time-varying environmental fields in SSF/iSSF annotation and diagnostics. A truly dynamic coefficient model,
 
 $$
-\tilde{x}_g
-=
-\frac{1}{|A_g|}
-\int_{A_g}
-x^{*}(s,t)\,ds
-+
-\epsilon_g,
+\beta_t \sim \mathcal{N}(\beta_{t-1},Q),
 $$
 
-where $\epsilon_g$ represents measurement, interpolation or classification error. A raster cell therefore describes an average or assigned class over an area, while the animal occupies a location within it. This difference in spatial support becomes consequential where the environmental field varies substantially within cells or where locational uncertainty is large relative to raster resolution.
+would represent a changing selection relationship itself. Such state-space coefficient evolution is a natural theoretical extension but is not implied merely because a predictor varies through time.
 
-Raster uncertainty arises from several sources: sensor and classification error, temporal mismatch, interpolation, reprojection, resampling and the averaging of heterogeneous conditions within pixels. Grain size is not merely another random error term. It determines the spatial support over which habitat is represented and may therefore alter the ecological relationship being estimated. Uncertainty about grain should be addressed through biologically motivated multiscale models or sensitivity analyses rather than concealed within a single residual variance (Northrup et al., 2022).
+## 8. What can be predicted?
 
-A hierarchical model may combine these uncertainties schematically as
+The interpretation of prediction depends on the model class.
 
-$$
-\begin{aligned}
-\tilde{s}_{ij}
-&\sim
-p\left(
-\tilde{s}_{ij}\mid s_{ij},\psi_s
-\right),\\
-\tilde{x}
-&\sim
-p\left(
-\tilde{x}\mid x^{*},\psi_x
-\right),\\
-y_{ij}
-&\sim
-p\left(
-y_{ij}\mid s_{ij},x^{*},\beta_i
-\right),
-\end{aligned}
-$$
+**RSF:** predicts relative selection across a defined spatial domain. Maps rank areas by fitted selection, conditional on availability and model specification.
 
-where $\psi_s$ and $\psi_x$ govern locational and environmental uncertainty. The posterior distribution of $\beta_i$ then reflects uncertainty not only in sampling, but also in the positions and environmental conditions upon which inference depends.
+**SSF:** predicts the relative probability of choosing one candidate endpoint over alternatives from the same start. The probabilities are local to the choice set.
 
-This propagation is especially important for derived quantities. Selection surfaces, utilisation distributions and simulated trajectories should not be calculated solely from posterior mean coefficients and a single environmental raster. They may instead be generated repeatedly from posterior draws of locations, environmental fields and model parameters, producing a distribution of predictions rather than one deceptively exact map.
+**iSSF:** additionally estimates how environmental conditions change the movement kernel. Derived expected displacement and turning distributions are often more interpretable than raw movement-interaction coefficients.
 
-## Individual Variation as Biological Information
+None of these quantities is automatically a measure of habitat quality or fitness. Establishing that a selected environment improves survival, reproduction or population growth requires demographic information or an explicit fitness model. This separation between **selection** and **quality** is one of the most important lessons of the classical habitat literature.
 
-A population-level coefficient describes a central tendency; it does not imply that all individuals respond alike. Animals may differ in habitat selection because of sex, age, reproductive state, experience, physiology, social status, competitive ability or behavioural phenotype. Pooling these differences into a single coefficient may obscure opposing responses and understate uncertainty at the population level (Leclerc et al., 2016; Muff et al., 2020; Northrup et al., 2022).
+Long-term utilisation distributions, residence times, crossing probabilities and home-range geometry are emergent properties of repeated movement decisions. In principle they are obtained by simulating the fitted transition process. Habitat-biased forward simulation is not yet implemented as a production hrHSA workflow, so the current package should not be described as providing these long-term simulations directly.
 
-Individual-specific selection coefficients may be represented hierarchically as
+## 9. Choosing an analytical route
 
-$$
-\beta_i
-=
-\mu_{\beta}
-+
-Z_i\gamma
-+
-b_i,
-$$
+A practical decision sequence is:
 
-with
+1. **Define the biological decision scale.** Which order of selection or movement decision is the study intended to represent?
+2. **Define availability before fitting.** The available distribution determines what selection means.
+3. **Use RSF** when a broader spatial availability domain is defensible and the target is relative space use.
+4. **Use SSF** when local reachability between fixes is central but the movement proposal can be treated as the availability-generating mechanism.
+5. **Use iSSF** when the movement kernel itself is part of the ecological question or environmental conditions are hypothesized to modify displacement or turning.
+6. **Use hierarchical Bayesian inference** when population-level inference and individual heterogeneity are both targets, or when posterior uncertainty must propagate through derived predictions.
+7. **Validate according to the intended transfer task.** New time periods, new animals and new strata are different prediction problems.
+8. **Interpret derived quantities on their natural scale.** Relative selection, local choice probability, expected displacement, density and habitat quality are not interchangeable.
 
-$$
-b_i
-\sim
-\mathcal{N}
-\left(
-0,\Sigma_{\beta}
-\right).
-$$
+The specialized documentation develops each route in detail:
 
-Here, $\mu_{\beta}$ is the population-level mean response, $Z_i\gamma$ describes systematic differences associated with measured individual attributes, and $b_i$ represents residual variation among individuals. The covariance matrix $\Sigma_{\beta}$ quantifies both the magnitude of individual variation and correlations among selection responses.
+- [Object-oriented RSF workflows](rsf_objects.md)
+- [Hierarchical Bayesian RSF workflow](bayesian_rsf.md)
+- [Step-selection workflows](ssf.md)
+- [Integrated step-selection workflows](issf.md)
+- [Dynamic environmental condition plots](ssf_dynamic_conditions.md)
 
-This model partially pools information across animals. Individuals with abundant and informative data retain strongly individual estimates, whereas poorly sampled individuals are drawn towards the population distribution. Partial pooling avoids the two extremes of treating every relocation as an independent population replicate and fitting entirely separate models whose imprecise estimates are subsequently treated as exact.
+## Principal references
 
-Individual variation also changes population-level prediction. Because the selection function is nonlinear,
-
-$$
-\operatorname{E}_i
-\left[
-\exp(x\beta_i)
-\right]
-\neq
-\exp
-\left[
-x\operatorname{E}_i(\beta_i)
-\right].
-$$
-
-The prediction obtained from the mean individual is therefore not generally equal to the mean prediction across individuals. Population-level maps should integrate over the estimated distribution of individual responses rather than merely substitute $\mu_{\beta}$ into the selection function.
-
-Among-individual variation is not statistical debris around a population mean. It is a property of the population and may reveal individual specialisation, alternative behavioural tactics or differences in environmental sensitivity. Phenotypic variation is also the material upon which natural selection can act. Variation in estimated habitat-selection behaviour is not, by itself, evidence of adaptive potential: an evolutionary response additionally requires that differences are sufficiently persistent, heritable and associated with fitness. Hierarchical habitat-selection models can establish and quantify behavioural variation, while pedigrees, genomic information, repeated observations and demographic data are required to distinguish its genetic, environmental and fitness-related components (Leclerc et al., 2016; Gervais et al., 2022).
-
-## Detecting Change
-
-Conventional selection models assume that the coefficient vector $\beta$ remains constant over the period of inference. Yet selection may vary with season, life-history stage, population density, resource availability, disturbance, learning or climatic conditions. In a changing environment, it is therefore insufficient to ask only which habitats are selected on average. We must also ask whether, when and among whom the relationship is changing.
-
-A time-varying selection function may be written as
-
-$$
-w_{i,t}(x)
-=
-\exp
-\left(
-x\beta_{i,t}
-\right).
-$$
-
-Where change is expected to be gradual, the coefficients may evolve according to a stochastic process such as
-
-$$
-\beta_{i,t}
-\sim
-\mathcal{N}
-\left(
-\beta_{i,t-1},
-Q
-\right),
-$$
-
-where $Q$ controls the rate and covariance of temporal change. Smaller values of $Q$ imply comparatively stable selection, whereas larger values permit more rapid variation. Alternative models may impose seasonal periodicity, smooth temporal trends or dependence upon measured environmental drivers.
-
-Where an abrupt transition is expected, a change-point model may instead be used:
-
-$$
-\beta_{i,t}
-=
-\begin{cases}
-\beta_i^{(1)}, & t < \tau_i,\\
-\beta_i^{(2)}, & t \geq \tau_i,
-\end{cases}
-$$
-
-where $\tau_i$ is the unknown time of change. Bayesian inference yields a posterior distribution for $\tau_i$ rather than forcing the transition to coincide with an analyst-defined season or calendar date.
-
-Temporal change and individual variation may be separated through
-
-$$
-\beta_{i,t}
-=
-\mu_t
-+
-b_i
-+
-u_{i,t},
-$$
-
-where $\mu_t$ is the population-wide trajectory, $b_i$ is a persistent individual deviation and $u_{i,t}$ describes within-individual change. This distinction separates population-wide redistribution from differences in individual timing and response. It also prevents changes in the composition of the sampled population from being mistaken for behavioural change within individuals.
-
-Posterior distributions permit direct statements concerning change. For a coefficient $\beta_j$, one may calculate
-
-$$
-\Pr
-\left(
-\beta_{j,t_2}
--
-\beta_{j,t_1}
->
-0
-\mid
-\mathcal{D}
-\right),
-$$
-
-or the posterior probability that a change exceeds a biologically meaningful threshold. The result describes the magnitude, direction and uncertainty of change rather than reducing inference to a sequence of separate significance tests.
-
-This capacity is particularly relevant under global change. Changes in climate, land use and human disturbance may alter both the distribution of available habitat and the manner in which animals respond to it. A dynamic model can distinguish a changing environmental landscape from a changing selection relationship, provided that both used and available conditions are represented through time. It may reveal gradual adjustment, abrupt displacement, increased variability or divergent responses among individuals.
-
-Temporal change in a coefficient does not, however, identify its cause. Apparent non-stationarity may arise from season, reproduction, ageing, population density, behavioural state, changing availability or alteration of the observation process. Attribution to global change requires explicit environmental hypotheses, suitable temporal replication and, where possible, comparison across populations or landscapes. Dynamic Bayesian models expose change and quantify its uncertainty; they do not replace ecological reasoning.
-
-## Posterior Prediction and Model Evaluation
-
-The principal practical advantage of the Bayesian formulation is that uncertainty can be carried into every derived prediction. Let $\Theta$ collect the parameters and latent states of the fitted model. The posterior predictive distribution is
-
-$$
-p
-\left(
-\tilde{\mathcal{D}}
-\mid
-\mathcal{D}
-\right)
-=
-\int
-p
-\left(
-\tilde{\mathcal{D}}
-\mid
-\Theta
-\right)
-p
-\left(
-\Theta
-\mid
-\mathcal{D}
-\right)
-\,d\Theta.
-$$
-
-Each posterior draw represents one plausible state of the ecological system. Repeated prediction or simulation therefore propagates uncertainty in locations, environmental covariates, individual responses and temporal dynamics into selection maps, utilisation distributions and simulated movement paths.
-
-Bayesian inference does not remove the need for validation. Priors should be examined through prior-predictive simulation, fitted models through posterior-predictive checks, and predictive performance through the temporally blocked and leave-one-individual-out procedures described in the preceding chapter. Weak identifiability, an inappropriate availability distribution or an inadequate ecological model cannot be repaired by increasingly elaborate computation.
-
-The purpose of the Bayesian extension is therefore not complexity for its own sake. It is to bring the inferential model into closer correspondence with the ecological system: locations and environments are observed imperfectly, populations consist of heterogeneous individuals, and selection may change through time. Representing these processes jointly permits uncertainty to remain visible, individual variation to become an object of inference and ecological change to be detected rather than averaged away.
-
-## Principal References
-
-Auger-Méthé, M., Newman, K., Cole, D., Empacher, F., Gryba, R., King, A. A., Leos-Barajas, V., Mills Flemming, J., Nielsen, A., Petris, G. & Thomas, L. (2021). A guide to state-space modeling of ecological time series. *Ecological Monographs*, **91**, e01470.
-
-Dejeante, R., Valeix, M. & Chamaillé-Jammes, S. (2024). Time-varying habitat selection analysis: a model and applications for studying diel, seasonal, and post-release changes. *Ecology*, **105**, e4233.
-
-Frair, J. L., Nielsen, S. E., Merrill, E. H., Lele, S. R., Boyce, M. S., Munro, R. H. M., Stenhouse, G. B. & Beyer, H. L. (2004). Removing GPS collar bias in habitat selection studies. *Journal of Applied Ecology*, **41**, 201–212.
-
-Gervais, L., Morellet, N., David, I., Hewison, M., Réale, D., Goulard, M., Chaval, Y., Lourtet, B., Cargnelutti, B., Merlet, J., Quéméré, E. & Pujol, B. (2022). Quantifying heritability and estimating evolutionary potential in the wild when individuals that share genes also share environments. *Journal of Animal Ecology*, **91**, 1239–1250.
-
-Hooten, M. B., Johnson, D. S., McClintock, B. T. & Morales, J. M. (2017). *Animal Movement: Statistical Models for Telemetry Data*. Boca Raton: CRC Press.
-
-Jonsen, I. D., Flemming, J. M. & Myers, R. A. (2005). Robust state-space modeling of animal movement data. *Ecology*, **86**, 2874–2880.
-
-Leclerc, M., Vander Wal, E., Zedrosser, A., Swenson, J. E., Kindberg, J. & Pelletier, F. (2016). Quantifying consistent individual differences in habitat selection. *Oecologia*, **180**, 697–705.
-
-Muff, S., Signer, J. & Fieberg, J. (2020). Accounting for individual-specific variation in habitat-selection studies: efficient estimation of mixed-effects models using Bayesian or frequentist computation. *Journal of Animal Ecology*, **89**, 80–92.
-
-Nielson, R. M., Manly, B. F. J., McDonald, L. L., Sawyer, H. & McDonald, T. L. (2009). Estimating habitat selection when GPS fix success is less than 100%. *Ecology*, **90**, 2956–2962.
-
-Northrup, J. M., Vander Wal, E., Bonar, M., Fieberg, J., Laforge, M. P., Leclerc, M., Prokopenko, C. M. & Gerber, B. D. (2022). Conceptual and methodological advances in habitat-selection modeling: guidelines for ecology and evolution. *Ecological Applications*, **32**, e02470.
-
-Patterson, T. A., Thomas, L., Wilcox, C., Ovaskainen, O. & Matthiopoulos, J. (2008). State-space models of individual animal movement. *Trends in Ecology & Evolution*, **23**, 87–94.
-
-Aarts, G., Fieberg, J. & Matthiopoulos, J. (2012). Comparative interpretation of count, presence--absence and point methods for species distribution models. *Methods in Ecology and Evolution*, **3**, 177--187.
+Aarts, G., Fieberg, J. & Matthiopoulos, J. (2012). Comparative interpretation of count, presence-absence and point methods for species distribution models. *Methods in Ecology and Evolution*, **3**, 177--187.
 
 Avgar, T., Potts, J. R., Lewis, M. A. & Boyce, M. S. (2016). Integrated step selection analysis: bridging the gap between resource selection and animal movement. *Methods in Ecology and Evolution*, **7**, 619--630.
 
-Boyce, M. S., Vernier, P. R., Nielsen, S. E. & Schmiegelow, F. K. A. (2002). Evaluating Resource Selection Functions. *Ecological Modelling*, **157**, 281--300.
+Charnov, E. L. (1976). Optimal foraging, the marginal value theorem. *Theoretical Population Biology*, **9**, 129--136.
 
-Fieberg, J., Matthiopoulos, J., Hebblewhite, M., Boyce, M. S. & Frair, J. L. (2010). Correlation and studies of habitat selection: problem, red herring or opportunity? *Philosophical Transactions of the Royal Society B*, **365**, 2233--2244.
+Fretwell, S. D. & Lucas, H. L. (1969). On territorial behavior and other factors influencing habitat distribution in birds. *Acta Biotheoretica*, **19**, 16--36.
 
-Fieberg, J., Signer, J., Smith, B. & Avgar, T. (2021). A “how to” guide for interpreting parameters in habitat-selection analyses. *Journal of Animal Ecology*, **90**, 1027--1043.
+Johnson, C. J., Nielsen, S. E., Merrill, E. H., McDonald, T. L. & Boyce, M. S. (2006). Resource selection functions based on use-availability data: theoretical motivation and evaluation methods. *Journal of Wildlife Management*, **70**, 347--357.
 
-Forester, J. D., Im, H. K. & Rathouz, P. J. (2009). Accounting for animal movement in estimation of Resource Selection Functions: sampling and data analysis. *Ecology*, **90**, 3554--3565.
+Johnson, D. H. (1980). The comparison of usage and availability measurements for evaluating resource preference. *Ecology*, **61**, 65--71.
 
-Fortin, D., Beyer, H. L., Boyce, M. S., Smith, D. W., Duchesne, T. & Mao, J. S. (2005). Wolves influence elk movements: behavior shapes a trophic cascade in Yellowstone National Park. *Ecology*, **86**, 1320--1330.
+Lele, S. R., Merrill, E. H., Keim, J. & Boyce, M. S. (2013). Selection, use, choice and occupancy: clarifying concepts in resource selection studies. *Journal of Animal Ecology*, **82**, 1183--1191.
 
-Hirzel, A. H., Le Lay, G., Helfer, V., Randin, C. & Guisan, A. (2006). Evaluating the ability of habitat-suitability models to predict species presences. *Ecological Modelling*, **199**, 142--152.
+MacArthur, R. H. & Pianka, E. R. (1966). On optimal use of a patchy environment. *American Naturalist*, **100**, 603--609.
 
-Johnson, C. J., Nielsen, S. E., Merrill, E. H., McDonald, T. L. & Boyce, M. S. (2006). Resource Selection Functions based on use--availability data: theoretical motivation and evaluation methods. *Journal of Wildlife Management*, **70**, 347--357.
+Manly, B. F. J., McDonald, L. L., Thomas, D. L., McDonald, T. L. & Erickson, W. P. (2002). *Resource Selection by Animals: Statistical Design and Analysis for Field Studies*. 2nd ed. Kluwer Academic Publishers.
 
-Northrup, J. M., Hooten, M. B., Anderson, C. R. & Wittemyer, G. (2013). Practical guidance on characterizing availability in Resource Selection Functions under a use--availability design. *Ecology*, **94**, 1456--1463.
+Morris, D. W. (2003). Toward an ecological synthesis: a case for habitat selection. *Oecologia*, **136**, 1--13.
 
-Roberts, D. R. et al. (2017). Cross-validation strategies for data with temporal, spatial, hierarchical, or phylogenetic structure. *Ecography*, **40**, 913--929.
+Muff, S., Signer, J. & Fieberg, J. (2020). Accounting for individual-specific variation in habitat-selection studies: efficient estimation of mixed-effects models using Bayesian or frequentist computation. *Journal of Animal Ecology*, **89**, 80--92.
 
-Warton, D. I. & Shepherd, L. C. (2010). Poisson point-process models solve the “pseudo-absence problem” for presence-only data in ecology. *The Annals of Applied Statistics*, **4**, 1383--1402.
+Northrup, J. M. et al. (2022). Conceptual and methodological advances in habitat-selection modeling: guidelines for ecology and evolution. *Ecological Applications*, **32**, e02470.
+
+Rosenzweig, M. L. (1981). A theory of habitat selection. *Ecology*, **62**, 327--335.
+
+Van Horne, B. (1983). Density as a misleading indicator of habitat quality. *Journal of Wildlife Management*, **47**, 893--901.
+
+Warton, D. I. & Shepherd, L. C. (2010). Poisson point process models solve the "pseudo-absence problem" for presence-only data in ecology. *Annals of Applied Statistics*, **4**, 1383--1402.

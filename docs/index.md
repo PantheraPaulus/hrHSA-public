@@ -4,7 +4,6 @@
 
 Developed primarily for wildlife telemetry and spatial ecology, **hrHSA** addresses the more general problem of inferring interactions between actively and/or passively redistributing entities and their spatial context. Its methods therefore extend naturally to applications in geospatial science, epidemiology, environmental modelling, human mobility, and other domains concerned with spatially structured processes. Reproducible, vectorized, out-of-core, and HPC-ready workflows support analyses from covariate extraction and parameter estimation to predictive simulation.
 
-
 ```{toctree}
 :maxdepth: 1
 :caption: Documentation
@@ -12,6 +11,17 @@ Developed primarily for wildlife telemetry and spatial ecology, **hrHSA** addres
 getting_started
 theory
 implementation
+hpc-performance
+workstation-benchmark
+inference-performance
+coolmuc4-tuning
+coolmuc4-benchmark
+rsf_objects
+bayesian_rsf
+ssf
+issf
+ssf_fast_engine
+ssf_dynamic_conditions
 case-studies
 api
 ```
