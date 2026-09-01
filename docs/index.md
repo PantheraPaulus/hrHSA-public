@@ -7,9 +7,9 @@ Developed primarily for wildlife telemetry and spatial ecology, **hrHSA** addres
 ```{toctree}
 :maxdepth: 1
 :caption: Documentation
-
 getting_started
 theory
 implementation
 case-studies
+performance
 ```
