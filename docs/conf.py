@@ -23,7 +23,7 @@ sys.path.insert(0, str(SOURCE_DIRECTORY))
 
 project = "hrHSA"
 copyright = "2026 MolZoo"
-author = "Paul Kasko, Lubov Kabo, and Ralph Kühn"
+author = "Kasko & Kühn, 2026 (GNU)"
 release = "0.1.0"
 
 
@@ -39,7 +39,11 @@ extensions = [
     "sphinx.ext.intersphinx",
     "sphinx.ext.mathjax",
     "sphinx_autodoc_typehints",
+    "sphinxcontrib.mermaid"
 ]
+
+myst_fence_as_directive = ["mermaid"]
+mermaid_output_format = "raw"
 
 autosummary_generate = True
 
